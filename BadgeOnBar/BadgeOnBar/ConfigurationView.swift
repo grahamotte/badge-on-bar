@@ -37,7 +37,7 @@ struct ConfigurationView: View {
                         .tag(app.id)
                     }
                 } header: {
-                    Text("Apps")
+                    Text("Apps on Dock")
                 }
             }
             .listStyle(.sidebar)
@@ -55,20 +55,21 @@ struct ConfigurationView: View {
     }
 
     private var monitoredApps: [MonitoredApp] {
+        let dockIDs = Set(monitor.dockApps.map(\.bundleID))
         let runningIDs = Set(monitor.availableApps.map(\.bundleID))
         var apps: [MonitoredApp] = []
 
-        for info in monitor.availableApps {
+        for info in monitor.dockApps {
             apps.append(MonitoredApp(
                 bundleID: info.bundleID,
                 name: info.name,
                 icon: info.icon,
-                isRunning: true,
+                isRunning: runningIDs.contains(info.bundleID),
                 isEnabled: settings.isMonitored(info.bundleID)
             ))
         }
 
-        for bundleID in settings.monitoredBundleIDs where !runningIDs.contains(bundleID) {
+        for bundleID in settings.monitoredBundleIDs where !dockIDs.contains(bundleID) {
             guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
                   let bundle = Bundle(url: url) else { continue }
             let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
@@ -79,12 +80,12 @@ struct ConfigurationView: View {
                 bundleID: bundleID,
                 name: name,
                 icon: icon,
-                isRunning: false,
+                isRunning: runningIDs.contains(bundleID),
                 isEnabled: true
             ))
         }
 
-        return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return apps
     }
 }
 

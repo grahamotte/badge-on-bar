@@ -21,6 +21,7 @@ struct AppBadgeInfo: Identifiable, Equatable {
 final class BadgeMonitor {
     var badges: [String: Int] = [:]
     var availableApps: [AppBadgeInfo] = []
+    var dockApps: [AppBadgeInfo] = []
 
     var onUpdate: (() -> Void)?
 
@@ -28,6 +29,7 @@ final class BadgeMonitor {
     private var timer: Timer?
     private var observer: AXObserver?
     private var dockAppElements: [String: AXUIElement] = [:]
+    private var installedAppRegistry: [String: (bundleID: String, name: String)] = [:]
 
     func start() {
         guard !isRunning, PermissionsManager.isTrusted else {
@@ -36,6 +38,7 @@ final class BadgeMonitor {
         }
         isRunning = true
 
+        buildInstalledAppRegistry()
         refreshRunningApps()
         reloadDockElements()
         readBadges()
@@ -140,6 +143,26 @@ final class BadgeMonitor {
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
+    private func buildInstalledAppRegistry() {
+        var registry: [String: (bundleID: String, name: String)] = [:]
+        let dirs = ["/Applications", "/System/Applications",
+                    NSString(string: "~/Applications").expandingTildeInPath]
+        let fm = FileManager.default
+        for dir in dirs {
+            guard let contents = try? fm.contentsOfDirectory(atPath: dir) else { continue }
+            for item in contents where item.hasSuffix(".app") {
+                let path = "\(dir)/\(item)"
+                guard let bundle = Bundle(path: path),
+                      let bundleID = bundle.bundleIdentifier else { continue }
+                let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                    ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+                    ?? item.replacingOccurrences(of: ".app", with: "")
+                registry[name] = (bundleID, name)
+            }
+        }
+        installedAppRegistry = registry
+    }
+
     private func reloadDockElements() {
         let pid = getDockPID()
         guard pid != 0 else {
@@ -154,18 +177,23 @@ final class BadgeMonitor {
         }
 
         var newCache: [String: AXUIElement] = [:]
+        var orderedDockApps: [AppBadgeInfo] = []
 
         for element in allElements {
             var title: AnyObject?
             guard AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &title) == .success,
                   let titleStr = title as? String, !titleStr.isEmpty else { continue }
 
-            if let app = matchTitleToApp(titleStr) {
-                newCache[app.bundleID] = element
+            if let app = resolveDockTitle(titleStr) {
+                if newCache[app.bundleID] == nil {
+                    newCache[app.bundleID] = element
+                    orderedDockApps.append(app)
+                }
             }
         }
 
         dockAppElements = newCache
+        dockApps = orderedDockApps
     }
 
     private func flattenDockElements(root: AXUIElement) -> [AXUIElement]? {
@@ -193,7 +221,7 @@ final class BadgeMonitor {
         return nil
     }
 
-    private func matchTitleToApp(_ title: String) -> AppBadgeInfo? {
+    private func resolveDockTitle(_ title: String) -> AppBadgeInfo? {
         if let app = availableApps.first(where: { $0.name == title }) {
             return app
         }
@@ -204,6 +232,14 @@ final class BadgeMonitor {
             let cfName = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
                 ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
             if cfName == title { return app }
+        }
+
+        if let (bundleID, name) = installedAppRegistry[title] {
+            var icon: NSImage?
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                icon = NSWorkspace.shared.icon(forFile: url.path)
+            }
+            return AppBadgeInfo(bundleID: bundleID, name: name, icon: icon)
         }
 
         return nil
