@@ -1,35 +1,41 @@
 import AppKit
 
 final class StatusItemView: NSView {
-    var icon: NSImage?
-    var badgeCount: Int = 0
-    var isRunning: Bool = true
+    var appIcon: NSImage? {
+        didSet { iconView.image = appIcon; needsDisplay = true }
+    }
+    var badgeCount: Int = 0 {
+        didSet { needsDisplay = true }
+    }
+    var isRunning: Bool = true {
+        didSet { iconView.alphaValue = isRunning ? 1.0 : 0.35; needsDisplay = true }
+    }
     var onLeftClick: (() -> Void)?
     var onRightClick: (() -> Void)?
 
-    private var trackingArea: NSTrackingArea?
+    private let iconView: NSImageView = {
+        let iv = NSImageView()
+        iv.imageScaling = .scaleProportionallyUpOrDown
+        return iv
+    }()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        iconView.frame = NSRect(x: 1, y: (frame.height - 18) / 2, width: 18, height: 18)
+        addSubview(iconView)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
 
     override func draw(_ dirtyRect: NSRect) {
-        let iconSize: CGFloat = 18
-        let iconY = (bounds.height - iconSize) / 2
-        let iconRect = NSRect(x: 1, y: iconY, width: iconSize, height: iconSize)
-
-        if let icon, isRunning {
-            icon.draw(in: iconRect)
-        } else if let icon {
-            icon.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 0.35)
-        } else {
-            NSColor.tertiaryLabelColor.setFill()
-            let path = NSBezierPath(roundedRect: iconRect.insetBy(dx: 4, dy: 4), xRadius: 4, yRadius: 4)
-            path.fill()
-        }
-
+        super.draw(dirtyRect)
         if badgeCount > 0, isRunning {
-            drawBadge(afterIcon: iconSize + 1)
+            drawBadge()
         }
     }
 
-    private func drawBadge(afterIcon iconRight: CGFloat) {
+    private func drawBadge() {
+        let iconRight: CGFloat = 20
         let badgeText = badgeCount > 99 ? "99+" : "\(badgeCount)"
         let fontSize: CGFloat = badgeCount > 99 ? 7 : 9
         let textAttrs: [NSAttributedString.Key: Any] = [
@@ -61,7 +67,7 @@ final class StatusItemView: NSView {
     }
 
     func requiredWidth() -> CGFloat {
-        let base: CGFloat = 20
+        let base: CGFloat = 22
         let badge: CGFloat = badgeCount > 0 ? 16 : 0
         return base + badge
     }

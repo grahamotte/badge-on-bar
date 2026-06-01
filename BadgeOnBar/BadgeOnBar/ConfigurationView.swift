@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Combine
 
 struct ConfigurationView: View {
@@ -6,13 +7,22 @@ struct ConfigurationView: View {
     @Environment(BadgeMonitor.self) private var monitor
     @State private var selectedAppID: String?
     @State private var trusted = PermissionsManager.isTrusted
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         if trusted {
             mainView
-                .onAppear { monitor.start() }
+                .onReceive(timer) { _ in
+                    if !PermissionsManager.isTrusted {
+                        trusted = false
+                        monitor.stop()
+                    }
+                }
         } else {
             AccessibilitySetupView(trusted: $trusted)
+                .onReceive(timer) { _ in
+                    trusted = PermissionsManager.isTrusted
+                }
         }
     }
 
@@ -20,26 +30,153 @@ struct ConfigurationView: View {
         NavigationSplitView {
             List(selection: $selectedAppID) {
                 Section {
-                    ForEach(monitor.availableApps) { app in
-                        AppRow(app: app, isMonitored: settings.isMonitored(app.bundleID))
-                            .tag(app.id)
+                    ForEach(monitoredApps) { app in
+                        MonitoredAppRow(app: app) {
+                            settings.toggle(app.bundleID)
+                        }
+                        .tag(app.id)
                     }
                 } header: {
-                    Text("Running Apps")
+                    Text("Apps")
                 }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
         } detail: {
             if let selectedID = selectedAppID,
-               let app = monitor.availableApps.first(where: { $0.id == selectedID }) {
-                AppDetailView(app: app, isMonitored: settings.isMonitored(app.bundleID)) {
+               let app = monitoredApps.first(where: { $0.id == selectedID }) {
+                MonitoredAppDetailView(app: app) {
                     settings.toggle(app.bundleID)
                 }
             } else {
                 WelcomeView()
             }
         }
+    }
+
+    private var monitoredApps: [MonitoredApp] {
+        let runningIDs = Set(monitor.availableApps.map(\.bundleID))
+        var apps: [MonitoredApp] = []
+
+        for info in monitor.availableApps {
+            apps.append(MonitoredApp(
+                bundleID: info.bundleID,
+                name: info.name,
+                icon: info.icon,
+                isRunning: true,
+                isEnabled: settings.isMonitored(info.bundleID)
+            ))
+        }
+
+        for bundleID in settings.monitoredBundleIDs where !runningIDs.contains(bundleID) {
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
+                  let bundle = Bundle(url: url) else { continue }
+            let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+                ?? bundleID
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            apps.append(MonitoredApp(
+                bundleID: bundleID,
+                name: name,
+                icon: icon,
+                isRunning: false,
+                isEnabled: true
+            ))
+        }
+
+        return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+}
+
+private struct MonitoredApp: Identifiable {
+    let bundleID: String
+    let name: String
+    let icon: NSImage?
+    let isRunning: Bool
+    let isEnabled: Bool
+    var id: String { bundleID }
+}
+
+private struct MonitoredAppRow: View {
+    let app: MonitoredApp
+    let onToggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let icon = app.icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 20, height: 20)
+                    .opacity(app.isRunning ? 1 : 0.35)
+            } else {
+                Image(systemName: "app.fill")
+                    .resizable()
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(.secondary)
+                    .opacity(app.isRunning ? 1 : 0.35)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(app.name)
+                    .lineLimit(1)
+                if !app.isRunning {
+                    Text("Not running")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { app.isEnabled },
+                set: { _ in onToggle() }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+        }
+    }
+}
+
+private struct MonitoredAppDetailView: View {
+    let app: MonitoredApp
+    let onToggle: () -> Void
+
+    var body: some View {
+        VStack(spacing: 24) {
+            if let icon = app.icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .opacity(app.isRunning ? 1 : 0.35)
+            } else {
+                Image(systemName: "app.fill")
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(app.name)
+                .font(.title2)
+
+            Text(app.bundleID)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if !app.isRunning {
+                Text("App is not currently running")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
+            Toggle(isOn: Binding(
+                get: { app.isEnabled },
+                set: { _ in onToggle() }
+            )) {
+                Text(app.isEnabled ? "Showing in menu bar" : "Show in menu bar")
+            }
+            .toggleStyle(.switch)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -81,81 +218,12 @@ private struct AccessibilitySetupView: View {
             }
 
             Spacer()
-
-            Text("Waiting for permission...")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .padding(40)
         .frame(width: 480, height: 420)
         .onReceive(timer) { _ in
             trusted = PermissionsManager.isTrusted
         }
-    }
-}
-
-private struct AppRow: View {
-    let app: AppBadgeInfo
-    let isMonitored: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            if let icon = app.icon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 20, height: 20)
-            } else {
-                Image(systemName: "app.fill")
-                    .resizable()
-                    .frame(width: 20, height: 20)
-                    .foregroundStyle(.secondary)
-            }
-            Text(app.name)
-                .lineLimit(1)
-            Spacer()
-            Image(systemName: isMonitored ? "eye.fill" : "eye.slash")
-                .font(.caption)
-                .foregroundStyle(isMonitored ? .blue : .secondary.opacity(0.4))
-                .frame(width: 16)
-        }
-    }
-}
-
-private struct AppDetailView: View {
-    let app: AppBadgeInfo
-    let isMonitored: Bool
-    let onToggle: () -> Void
-
-    var body: some View {
-        VStack(spacing: 24) {
-            if let icon = app.icon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 64, height: 64)
-            } else {
-                Image(systemName: "app.fill")
-                    .resizable()
-                    .frame(width: 64, height: 64)
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(app.name)
-                .font(.title2)
-
-            Text(app.bundleID)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Toggle(isOn: Binding(
-                get: { isMonitored },
-                set: { _ in onToggle() }
-            )) {
-                Text(isMonitored ? "Showing in menu bar" : "Show in menu bar")
-            }
-            .toggleStyle(.switch)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

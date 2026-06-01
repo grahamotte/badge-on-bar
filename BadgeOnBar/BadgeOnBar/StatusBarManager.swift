@@ -29,18 +29,23 @@ final class StatusBarManager {
         }
 
         for bundleID in monitored {
+            let info = lookupAppInfo(for: bundleID)
             let isRunning = monitor.availableApps.contains(where: { $0.bundleID == bundleID })
             let badge = monitor.badges[bundleID] ?? 0
-            let appInfo = monitor.availableApps.first(where: { $0.bundleID == bundleID })
 
             if let existingView = statusViews[bundleID] {
-                existingView.icon = appInfo?.icon
+                existingView.appIcon = info.icon
                 existingView.badgeCount = badge
                 existingView.isRunning = isRunning
                 statusItems[bundleID]?.length = existingView.requiredWidth()
-                existingView.needsDisplay = true
             } else {
-                createStatusItem(for: bundleID, icon: appInfo?.icon, name: appInfo?.name ?? bundleID, badge: badge, isRunning: isRunning)
+                createStatusItem(
+                    for: bundleID,
+                    icon: info.icon,
+                    name: info.name,
+                    badge: badge,
+                    isRunning: isRunning
+                )
             }
         }
     }
@@ -49,7 +54,7 @@ final class StatusBarManager {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let view = StatusItemView(frame: NSRect(x: 0, y: 0, width: 30, height: NSStatusBar.system.thickness))
-        view.icon = icon
+        view.appIcon = icon
         view.badgeCount = badge
         view.isRunning = isRunning
 
@@ -73,6 +78,21 @@ final class StatusBarManager {
         }
         statusItems.removeValue(forKey: bundleID)
         statusViews.removeValue(forKey: bundleID)
+    }
+
+    private func lookupAppInfo(for bundleID: String) -> (name: String, icon: NSImage?) {
+        if let appInfo = monitor.availableApps.first(where: { $0.bundleID == bundleID }) {
+            return (appInfo.name, appInfo.icon)
+        }
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
+              let bundle = Bundle(url: url) else {
+            return (bundleID, nil)
+        }
+        let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+            ?? bundleID
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        return (name, icon)
     }
 
     private func showContextMenu(for bundleID: String, name: String, from view: NSView?) {
