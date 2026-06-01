@@ -4,21 +4,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIGURATION="${1:-Debug}"
 DERIVED_DATA_PATH="$ROOT_DIR/dist/.build/xcode"
-ROOT_APP_PATH="$ROOT_DIR/dist/Scamp Micro Deck.app"
+ROOT_APP_PATH="$ROOT_DIR/dist/BadgeOnBar.app"
 
 if [[ "$CONFIGURATION" != "Debug" && "$CONFIGURATION" != "Release" ]]; then
   echo "Usage: $0 [Debug|Release]"
   exit 1
 fi
 
-if [[ -d "$ROOT_DIR/ScampMicroDeck.xcodeproj" ]]; then
-  PROJECT_PATH="$ROOT_DIR/ScampMicroDeck.xcodeproj"
-else
-  echo "Could not find ScampMicroDeck.xcodeproj"
+PROJECT_PATH="$ROOT_DIR/BadgeOnBar/BadgeOnBar.xcodeproj"
+
+if [[ ! -d "$PROJECT_PATH" ]]; then
+  echo "Could not find $PROJECT_PATH"
   exit 1
 fi
 
-APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/Scamp Micro Deck.app"
+APP_PATH="$DERIVED_DATA_PATH/Build/Products/$CONFIGURATION/BadgeOnBar.app"
 
 if ! xcodebuild -version >/dev/null 2>&1; then
   echo "xcodebuild is unavailable. Install Xcode and select it:"
@@ -26,10 +26,10 @@ if ! xcodebuild -version >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Building Scamp Micro Deck ($CONFIGURATION)..."
+echo "Building Badge on Bar ($CONFIGURATION)..."
 xcodebuild \
   -project "$PROJECT_PATH" \
-  -scheme ScampMicroDeck \
+  -scheme BadgeOnBar \
   -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   -destination "platform=macOS" \

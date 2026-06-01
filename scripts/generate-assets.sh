@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_IMAGE="${1:-$ROOT_DIR/assets/logo.png}"
-ICONSET_DIR="$ROOT_DIR/ScampMicroDeck/Assets.xcassets/AppIcon.appiconset"
+ICONSET_DIR="$ROOT_DIR/BadgeOnBar/BadgeOnBar/Assets.xcassets/AppIcon.appiconset"
 
 if ! command -v magick &>/dev/null && ! command -v convert &>/dev/null; then
   echo "ImageMagick is not installed. Install it with:"

@@ -1,11 +1,11 @@
 ---
 name: "publish"
-description: "Publish Scamp Micro Deck by requiring a clean worktree, running the version bump skill, running mise push, then running mise publish. Use when the user asks to publish, release, upload, or ship Scamp Micro Deck to App Store Connect."
+description: "Publish Badge on Bar by requiring a clean worktree, running the version bump skill, running mise push, then running mise publish. Use when the user asks to publish, release, upload, or ship Badge on Bar to App Store Connect."
 ---
 
 # Publish
 
-Use this skill when the user wants to publish Scamp Micro Deck.
+Use this skill when the user wants to publish Badge on Bar.
 
 ## Workflow
 

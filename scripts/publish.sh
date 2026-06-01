@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_PATH="$ROOT_DIR/ScampMicroDeck.xcodeproj"
+PROJECT_PATH="$ROOT_DIR/BadgeOnBar/BadgeOnBar.xcodeproj"
 EXPORT_OPTIONS_PLIST="$ROOT_DIR/scripts/ExportOptions-AppStoreConnect.plist"
-ARCHIVE_PATH="$ROOT_DIR/dist/archives/ScampMicroDeck.xcarchive"
-EXPORT_DIR="$ROOT_DIR/dist/export/ScampMicroDeck"
+ARCHIVE_PATH="$ROOT_DIR/dist/archives/BadgeOnBar.xcarchive"
+EXPORT_DIR="$ROOT_DIR/dist/export/BadgeOnBar"
 USE_ASC_API_KEY=0
 
 usage() {
@@ -65,17 +65,17 @@ fi
 configure_auth
 mkdir -p "$(dirname "$ARCHIVE_PATH")" "$EXPORT_DIR"
 
-echo "Archiving Scamp Micro Deck..."
+echo "Archiving Badge on Bar..."
 rm -rf "$ARCHIVE_PATH"
 xcodebuild_with_auth archive \
   -project "$PROJECT_PATH" \
-  -scheme ScampMicroDeck \
+  -scheme BadgeOnBar \
   -configuration Release \
   -destination "generic/platform=macOS" \
   -archivePath "$ARCHIVE_PATH" \
   -allowProvisioningUpdates
 
-echo "Uploading Scamp Micro Deck archive to App Store Connect..."
+echo "Uploading Badge on Bar archive to App Store Connect..."
 rm -rf "$EXPORT_DIR"
 xcodebuild_with_auth -exportArchive \
   -archivePath "$ARCHIVE_PATH" \
@@ -83,4 +83,4 @@ xcodebuild_with_auth -exportArchive \
   -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
   -allowProvisioningUpdates
 
-echo "Uploaded Scamp Micro Deck archive: $ARCHIVE_PATH"
+echo "Uploaded Badge on Bar archive: $ARCHIVE_PATH"

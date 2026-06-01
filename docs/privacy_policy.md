@@ -1,6 +1,6 @@
 **Privacy Policy**
 
-This privacy policy applies to the Scamp Micro Deck app (hereby referred to as "Application") for mobile devices that was created by Graham Otte (hereby referred to as "Service Provider") as a Free service. This service is intended for use "AS IS".
+This privacy policy applies to the Badge on Bar app (hereby referred to as "Application") for mobile devices that was created by Graham Otte (hereby referred to as "Service Provider") as a Free service. This service is intended for use "AS IS".
 
 **What information does the Application obtain and how is it used?**
 
