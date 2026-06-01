@@ -21,11 +21,13 @@ final class BadgeMonitor {
 
     var onUpdate: (() -> Void)?
 
+    private var isRunning = false
     private var timer: Timer?
     private var observer: AXObserver?
 
     func start() {
-        guard PermissionsManager.isTrusted else { return }
+        guard !isRunning, PermissionsManager.isTrusted else { return }
+        isRunning = true
 
         refreshRunningApps()
         pollBadges()
@@ -63,6 +65,7 @@ final class BadgeMonitor {
     }
 
     func stop() {
+        isRunning = false
         timer?.invalidate()
         timer = nil
         if let observer {

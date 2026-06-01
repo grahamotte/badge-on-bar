@@ -1,18 +1,24 @@
 import SwiftUI
+import Combine
 
 struct ConfigurationView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(BadgeMonitor.self) private var monitor
     @State private var selectedAppID: String?
+    @State private var trusted = PermissionsManager.isTrusted
 
     var body: some View {
+        if trusted {
+            mainView
+                .onAppear { monitor.start() }
+        } else {
+            AccessibilitySetupView(trusted: $trusted)
+        }
+    }
+
+    private var mainView: some View {
         NavigationSplitView {
             List(selection: $selectedAppID) {
-                if !PermissionsManager.isTrusted {
-                    Label("Accessibility Required", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                }
-
                 Section {
                     ForEach(monitor.availableApps) { app in
                         AppRow(app: app, isMonitored: settings.isMonitored(app.bundleID))
@@ -24,23 +30,6 @@ struct ConfigurationView: View {
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
-            .safeAreaInset(edge: .bottom) {
-                if !PermissionsManager.isTrusted {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Accessibility access is needed to read Dock badge counts.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Button("Open System Settings") {
-                            PermissionsManager.openSettings()
-                        }
-                        .buttonStyle(.link)
-                        .font(.caption)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
-            }
         } detail: {
             if let selectedID = selectedAppID,
                let app = monitor.availableApps.first(where: { $0.id == selectedID }) {
@@ -50,6 +39,57 @@ struct ConfigurationView: View {
             } else {
                 WelcomeView()
             }
+        }
+    }
+}
+
+private struct AccessibilitySetupView: View {
+    @Binding var trusted: Bool
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Image(systemName: "hand.raised.slash.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.orange)
+
+            Text("Accessibility Access Required")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            VStack(spacing: 8) {
+                Text("Badge on Bar needs Accessibility access to read badge counts from the Dock.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+
+                Text("Your data never leaves your device. This permission is only used to display badge counts in the menu bar.")
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 40)
+
+            VStack(spacing: 6) {
+                Button("Open System Settings") {
+                    PermissionsManager.openSettings()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Text("Then toggle Badge on Bar on and come back here.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text("Waiting for permission...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(40)
+        .frame(width: 480, height: 420)
+        .onReceive(timer) { _ in
+            trusted = PermissionsManager.isTrusted
         }
     }
 }
