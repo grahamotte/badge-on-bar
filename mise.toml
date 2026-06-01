@@ -1,0 +1,30 @@
+[tasks.build]
+description = "Build Scamp Micro Deck and publish /Scamp Micro Deck.app"
+run = "SCAMP_OPEN_FINDER=1 ./scripts/build.sh"
+
+[tasks.start]
+description = "Stop running app, clean old builds, rebuild, copy to root, and launch"
+run = "./scripts/start.sh"
+
+[tasks.xcode]
+description = "Open ScampMicroDeck.xcodeproj in Xcode"
+run = "bash -c 'if [[ -d ScampMicroDeck.xcodeproj ]]; then open ScampMicroDeck.xcodeproj; else echo \"Could not find ScampMicroDeck.xcodeproj\" >&2; exit 1; fi'"
+
+[tasks.publish]
+description = "Archive and upload Scamp Micro Deck to App Store Connect"
+run = "./scripts/publish.sh"
+
+[tasks.push]
+description = "Force-push master to Codeberg (origin) and GitHub (origin_backup)"
+run = '''
+set -euo pipefail
+push_to() {
+  local remote="$1"
+  local repo="$2"
+  git remote remove "$remote" 2>/dev/null || true
+  git remote add "$remote" "$repo"
+  git push -f "$remote" master
+}
+push_to origin "ssh://git@codeberg.org/grahamotte/scamp-micro-deck.git"
+push_to origin_backup "git@github.com:grahamotte/scamp-micro-deck.git"
+'''
