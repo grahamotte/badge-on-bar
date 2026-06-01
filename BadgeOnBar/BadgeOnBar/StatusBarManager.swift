@@ -31,9 +31,15 @@ final class StatusBarManager {
 
             if let item = items[bundleID] {
                 let btn = item.button!
-                btn.image = resizedIcon(icon, to: 18)
+                if btn.image !== icon { btn.image = resizedIcon(icon, to: 18) }
+                btn.image?.isTemplate = false
+                btn.imagePosition = .imageLeading
                 btn.alphaValue = running ? 1 : 0.35
-                btn.attributedTitle = badgeTitle(badge)
+                let attr = badgeString(badge)
+                btn.attributedTitle = attr
+                btn.title = attr.string
+                let textWidth = max(0, (attr.string as NSString).size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]).width)
+                item.length = 20 + ceil(textWidth)
                 btn.toolTip = name
             } else {
                 let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -41,7 +47,11 @@ final class StatusBarManager {
                 btn.image = resizedIcon(icon, to: 18)
                 btn.imagePosition = .imageLeading
                 btn.alphaValue = running ? 1 : 0.35
-                btn.attributedTitle = badgeTitle(badge)
+                let attr = badgeString(badge)
+                btn.attributedTitle = attr
+                btn.title = attr.string
+                let textWidth = max(0, (attr.string as NSString).size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]).width)
+                item.length = 20 + ceil(textWidth)
                 btn.toolTip = name
                 btn.target = self
                 btn.action = #selector(clicked(_:))
@@ -93,7 +103,7 @@ final class StatusBarManager {
         return rendered
     }
 
-    private func badgeTitle(_ count: Int) -> NSAttributedString {
+    private func badgeString(_ count: Int) -> NSAttributedString {
         guard count > 0 else { return NSAttributedString() }
         let text = count > 99 ? "99+" : "\(count)"
         return NSAttributedString(string: text, attributes: [
