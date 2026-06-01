@@ -72,3 +72,4 @@ SwiftUI window for managing which apps to monitor and adjusting preferences.
 - Call out incorrect assumptions about macOS, Swift, SwiftUI.
 - Keep recommendations practical and biased toward momentum.
 - Choose options that feel native, simple, and easy to evolve.
+- Ignore Doll's settings UI — it sucks and should not be used as a reference. However, Doll's main app code (badge monitoring, status bar management, permissions) is a useful implementation reference. The Doll source is available as a git submodule at `Doll/`.
