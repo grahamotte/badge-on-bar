@@ -1,6 +1,9 @@
 import SwiftUI
 import AppKit
 import Combine
+import OSLog
+
+private let cfgLog = Logger(subsystem: "com.grahamotte.badgeonbar", category: "ConfigView")
 
 struct ConfigurationView: View {
     @Environment(AppSettings.self) private var settings
@@ -31,10 +34,8 @@ struct ConfigurationView: View {
             List(selection: $selectedAppID) {
                 Section {
                     ForEach(monitoredApps) { app in
-                        MonitoredAppRow(app: app) {
-                            settings.toggle(app.bundleID)
-                        }
-                        .tag(app.id)
+                        MonitoredAppRow(app: app)
+                            .tag(app.id)
                     }
                 } header: {
                     Text("Apps on Dock")
@@ -45,9 +46,7 @@ struct ConfigurationView: View {
         } detail: {
             if let selectedID = selectedAppID,
                let app = monitoredApps.first(where: { $0.id == selectedID }) {
-                MonitoredAppDetailView(app: app) {
-                    settings.toggle(app.bundleID)
-                }
+                MonitoredAppDetailView(app: app)
             } else {
                 WelcomeView()
             }
@@ -64,8 +63,7 @@ struct ConfigurationView: View {
                 bundleID: info.bundleID,
                 name: info.name,
                 icon: info.icon,
-                isRunning: runningIDs.contains(info.bundleID),
-                isEnabled: settings.isMonitored(info.bundleID)
+                isRunning: runningIDs.contains(info.bundleID)
             ))
         }
 
@@ -80,11 +78,11 @@ struct ConfigurationView: View {
                 bundleID: bundleID,
                 name: name,
                 icon: icon,
-                isRunning: runningIDs.contains(bundleID),
-                isEnabled: true
+                isRunning: runningIDs.contains(bundleID)
             ))
         }
 
+        cfgLog.debug("monitoredApps list: \(apps.map { "\($0.name):\($0.bundleID)".debugDescription }.joined(separator: ", "), privacy: .public)")
         return apps
     }
 }
@@ -94,15 +92,21 @@ private struct MonitoredApp: Identifiable {
     let name: String
     let icon: NSImage?
     let isRunning: Bool
-    let isEnabled: Bool
     var id: String { bundleID }
 }
 
 private struct MonitoredAppRow: View {
     let app: MonitoredApp
-    let onToggle: () -> Void
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
+        let binding = Binding(
+            get: { settings.isMonitored(app.bundleID) },
+            set: { newValue in
+                cfgLog.info("toggle '\(app.name, privacy: .public)' (\(app.bundleID, privacy: .public)) → \(newValue)")
+                settings.setMonitored(app.bundleID, monitored: newValue)
+            }
+        )
         HStack(spacing: 8) {
             if let icon = app.icon {
                 Image(nsImage: icon)
@@ -126,22 +130,26 @@ private struct MonitoredAppRow: View {
                 }
             }
             Spacer()
-            Toggle("", isOn: Binding(
-                get: { app.isEnabled },
-                set: { _ in onToggle() }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.small)
+            Toggle("", isOn: binding)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
         }
     }
 }
 
 private struct MonitoredAppDetailView: View {
     let app: MonitoredApp
-    let onToggle: () -> Void
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
+        let binding = Binding(
+            get: { settings.isMonitored(app.bundleID) },
+            set: { newValue in
+                cfgLog.info("detail toggle '\(app.name, privacy: .public)' (\(app.bundleID, privacy: .public)) → \(newValue)")
+                settings.setMonitored(app.bundleID, monitored: newValue)
+            }
+        )
         VStack(spacing: 24) {
             if let icon = app.icon {
                 Image(nsImage: icon)
@@ -168,11 +176,8 @@ private struct MonitoredAppDetailView: View {
                     .foregroundStyle(.orange)
             }
 
-            Toggle(isOn: Binding(
-                get: { app.isEnabled },
-                set: { _ in onToggle() }
-            )) {
-                Text(app.isEnabled ? "Showing in menu bar" : "Show in menu bar")
+            Toggle(isOn: binding) {
+                Text(binding.wrappedValue ? "Showing in menu bar" : "Show in menu bar")
             }
             .toggleStyle(.switch)
         }
