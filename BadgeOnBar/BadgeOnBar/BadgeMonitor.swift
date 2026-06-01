@@ -107,10 +107,16 @@ final class BadgeMonitor {
         }
         availableApps = apps.compactMap { app in
             guard let bundleID = app.bundleIdentifier else { return nil }
+            let icon: NSImage? = {
+                if let url = app.bundleURL {
+                    return NSWorkspace.shared.icon(forFile: url.path)
+                }
+                return app.icon
+            }()
             return AppBadgeInfo(
                 bundleID: bundleID,
                 name: app.localizedName ?? bundleID,
-                icon: app.icon
+                icon: icon
             )
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
 

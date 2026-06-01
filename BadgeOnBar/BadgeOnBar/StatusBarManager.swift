@@ -114,50 +114,43 @@ final class StatusBarManager {
     }
 
     private func compositeIcon(icon: NSImage?, badge: Int) -> NSImage {
-        let size = NSSize(width: 28, height: 22)
-        let composite = NSImage(size: size, flipped: false) { rect in
+        let iconW: CGFloat = 18
+        let iconH: CGFloat = 18
+        let barH: CGFloat = NSStatusBar.system.thickness
+        let spacing: CGFloat = 2
+        let badgeH: CGFloat = barH - 6
+        let badgeW: CGFloat = badge > 0 ? 14 : 0
+        let width: CGFloat = iconW + spacing + badgeW
+
+        let composite = NSImage(size: NSSize(width: width, height: barH), flipped: false) { _ in
+            let iconY = (barH - iconH) / 2
+            let iconRect = NSRect(x: 1, y: iconY, width: iconW, height: iconH)
+
             if let icon {
-                let iconSize = NSSize(width: 18, height: 18)
-                let iconRect = NSRect(
-                    x: 0,
-                    y: (size.height - iconSize.height) / 2,
-                    width: iconSize.width,
-                    height: iconSize.height
-                )
-                icon.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+                icon.draw(in: iconRect)
             }
 
             if badge > 0 {
                 let badgeText = badge > 99 ? "99+" : "\(badge)"
                 let fontSize: CGFloat = badge > 99 ? 7 : 9
-
-                let textAttributes: [NSAttributedString.Key: Any] = [
+                let textAttrs: [NSAttributedString.Key: Any] = [
                     .font: NSFont.systemFont(ofSize: fontSize, weight: .bold),
                     .foregroundColor: NSColor.white
                 ]
-                let textSize = badgeText.size(withAttributes: textAttributes)
+                let textSize = badgeText.size(withAttributes: textAttrs)
+                let pillW = max(textSize.width + 4, badgeH)
 
-                let badgeWidth = max(textSize.width + 4, 10)
-                let badgeHeight: CGFloat = 11
-                let badgeX = icon != nil ? 18.0 : -2.0
-                let badgeY = size.height - badgeHeight - 1
-                let badgeRect = NSRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
+                let badgeX = iconW + spacing
+                let badgeY = (barH - badgeH) / 2 + 1
+                let badgeRect = NSRect(x: badgeX, y: badgeY, width: pillW, height: badgeH)
 
-                let badgePath = NSBezierPath(
-                    roundedRect: badgeRect,
-                    xRadius: badgeHeight / 2,
-                    yRadius: badgeHeight / 2
-                )
+                let path = NSBezierPath(roundedRect: badgeRect, xRadius: badgeH / 2, yRadius: badgeH / 2)
                 NSColor.systemRed.setFill()
-                badgePath.fill()
+                path.fill()
 
-                let textRect = NSRect(
-                    x: badgeRect.midX - textSize.width / 2,
-                    y: badgeRect.midY - textSize.height / 2,
-                    width: textSize.width,
-                    height: textSize.height
-                )
-                badgeText.draw(in: textRect, withAttributes: textAttributes)
+                let textX = badgeRect.midX - textSize.width / 2
+                let textY = badgeRect.midY - textSize.height / 2
+                badgeText.draw(at: NSPoint(x: textX, y: textY), withAttributes: textAttrs)
             }
 
             return true

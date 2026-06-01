@@ -32,7 +32,7 @@ struct ConfigurationView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Button("Open System Settings") {
-                            PermissionsManager.checkOrPrompt()
+                            PermissionsManager.openSettings()
                         }
                         .buttonStyle(.link)
                         .font(.caption)
