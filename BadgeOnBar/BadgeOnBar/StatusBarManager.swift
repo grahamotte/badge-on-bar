@@ -6,8 +6,6 @@ final class StatusBarManager {
     private let monitor: BadgeMonitor
     private var items: [String: NSStatusItem] = [:]
 
-    var configWindowShower: (() -> Void)?
-
     init(settings: AppSettings, monitor: BadgeMonitor) {
         self.settings = settings
         self.monitor = monitor
@@ -57,17 +55,6 @@ final class StatusBarManager {
                 btn.action = #selector(clicked(_:))
                 btn.sendAction(on: .leftMouseUp)
 
-                let menu = NSMenu()
-                let openItem = NSMenuItem(title: "Open \(name)", action: #selector(openViaMenu(_:)), keyEquivalent: "")
-                openItem.target = self
-                openItem.representedObject = bundleID
-                menu.addItem(openItem)
-                menu.addItem(NSMenuItem.separator())
-                let prefsItem = NSMenuItem(title: "Settings...", action: #selector(showConfig), keyEquivalent: ",")
-                prefsItem.target = self
-                menu.addItem(prefsItem)
-                item.menu = menu
-
                 items[bundleID] = item
             }
         }
@@ -75,20 +62,10 @@ final class StatusBarManager {
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
         guard let (id, _) = items.first(where: { $0.value.button == sender }) else { return }
-        if NSApp.currentEvent?.modifierFlags.contains(.option) == true {
-            configWindowShower?()
-        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
         }
     }
-
-    @objc private func openViaMenu(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return }
-        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
-    }
-
-    @objc private func showConfig() { configWindowShower?() }
 
     private func resizedIcon(_ icon: NSImage?, to size: CGFloat) -> NSImage? {
         guard let icon else { return nil }

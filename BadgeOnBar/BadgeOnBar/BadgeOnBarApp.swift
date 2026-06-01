@@ -27,9 +27,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBarManager = StatusBarManager(settings: settings, monitor: monitor)
-        statusBarManager?.configWindowShower = { [weak self] in
-            self?.showConfigWindow()
-        }
         monitor.start()
         PermissionsManager.checkOrPrompt()
 
