@@ -13,9 +13,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BF36D0AD2FCD531300C74DB3 /* BadgeOnBar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				"Info.plist",
-			);
 			path = BadgeOnBar;
 			sourceTree = "<group>";
 		};
@@ -263,6 +260,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BadgeOnBar/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Badge On Bar";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -270,7 +268,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ottesoft.badgeonbar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.badgeonbar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -297,6 +295,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BadgeOnBar/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Badge On Bar";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -304,7 +303,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ottesoft.badgeonbar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.badgeonbar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
