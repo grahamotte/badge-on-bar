@@ -88,25 +88,28 @@ final class StatusBarManager {
             return true
         }
         image.isTemplate = false
-        return image
+        guard let tiff = image.tiffRepresentation, let rendered = NSImage(data: tiff) else { return nil }
+        rendered.isTemplate = false
+        return rendered
     }
 
     private func badgeTitle(_ count: Int) -> NSAttributedString {
         guard count > 0 else { return NSAttributedString() }
         let text = count > 99 ? "99+" : "\(count)"
-        return NSAttributedString(string: " \(text)", attributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .bold),
-            .foregroundColor: NSColor.systemRed,
-            .baselineOffset: 1
+        return NSAttributedString(string: text, attributes: [
+            .font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.systemRed
         ])
     }
 
     private func resolve(_ bundleID: String, runningApp: AppBadgeInfo?) -> (String, NSImage?) {
-        if let runningApp { return (runningApp.name, runningApp.icon) }
+        if let runningApp, runningApp.icon != nil { return (runningApp.name, runningApp.icon) }
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
               let bundle = Bundle(url: url) else { return (bundleID, nil) }
         let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
             ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String) ?? bundleID
-        return (name, NSWorkspace.shared.icon(forFile: url.path))
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        return (name, icon)
     }
 }
+
