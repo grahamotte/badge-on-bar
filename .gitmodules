@@ -1,0 +1,3 @@
+[submodule "Doll"]
+	path = Doll
+	url = https://github.com/xiaogdgenuine/Doll.git
