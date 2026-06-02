@@ -165,7 +165,8 @@ final class BadgeMonitor {
             guard AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &title) == .success,
                   let titleStr = title as? String, !titleStr.isEmpty else { continue }
 
-            if let app = resolveDockTitle(titleStr, element: element) {
+            if let app = resolveDockTitle(titleStr, element: element),
+               app.bundleID != Bundle.main.bundleIdentifier {
                 if newCache[app.bundleID] == nil {
                     newCache[app.bundleID] = element
                     orderedDockApps.append(app)
