@@ -30,6 +30,12 @@ struct ConfigurationView: View {
         NavigationSplitView {
             List(selection: $selectedAppID) {
                 Section {
+                    SettingsRow()
+                        .tag("__settings__")
+                } header: {
+                    Text("Settings")
+                }
+                Section {
                     ForEach(monitoredApps) { app in
                         MonitoredAppRow(app: app)
                             .tag(app.id)
@@ -41,12 +47,17 @@ struct ConfigurationView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
         } detail: {
-            if let selectedID = selectedAppID,
-               let app = monitoredApps.first(where: { $0.id == selectedID }) {
+            if selectedAppID == "__settings__" {
+                SettingsDetailView()
+            } else if let selectedID = selectedAppID,
+                      let app = monitoredApps.first(where: { $0.id == selectedID }) {
                 MonitoredAppDetailView(app: app)
             } else {
                 WelcomeView()
             }
+        }
+        .onAppear {
+            selectedAppID = "__settings__"
         }
     }
 
@@ -80,6 +91,50 @@ struct ConfigurationView: View {
         }
 
         return apps
+    }
+}
+
+private struct SettingsRow: View {
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "gearshape")
+                .resizable()
+                .frame(width: 20, height: 20)
+                .foregroundStyle(.secondary)
+            Text("General")
+                .lineLimit(1)
+        }
+    }
+}
+
+private struct SettingsDetailView: View {
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Text("General")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Toggle(isOn: Binding(
+                get: { settings.startAtLogin },
+                set: { settings.setStartAtLogin($0) }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Start at Login")
+                    Text("Automatically launch Badge on Bar when you log in")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+
+            Spacer()
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
