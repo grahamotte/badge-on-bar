@@ -19,7 +19,7 @@ struct ConfigurationView: View {
                     }
                 }
         } else {
-            AccessibilitySetupView(trusted: $trusted)
+            AccessibilitySetupView()
                 .onReceive(timer) { _ in
                     trusted = PermissionsManager.isTrusted
                 }
@@ -177,9 +177,6 @@ private struct MonitoredAppDetailView: View {
 }
 
 private struct AccessibilitySetupView: View {
-    @Binding var trusted: Bool
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
     var body: some View {
         VStack(spacing: 28) {
             Image(systemName: "hand.raised.slash.fill")
@@ -217,9 +214,6 @@ private struct AccessibilitySetupView: View {
         }
         .padding(40)
         .frame(width: 480, height: 420)
-        .onReceive(timer) { _ in
-            trusted = PermissionsManager.isTrusted
-        }
     }
 }
 

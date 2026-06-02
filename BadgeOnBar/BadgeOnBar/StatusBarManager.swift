@@ -5,6 +5,7 @@ final class StatusBarManager {
     private let settings: AppSettings
     private let monitor: BadgeMonitor
     private var items: [String: NSStatusItem] = [:]
+    var onShowConfig: (() -> Void)?
 
     init(settings: AppSettings, monitor: BadgeMonitor) {
         self.settings = settings
@@ -29,41 +30,43 @@ final class StatusBarManager {
             let (name, icon) = resolve(bundleID, runningApp: appInfo)
 
             if let item = items[bundleID] {
-                let btn = item.button!
-                btn.image = resizedIcon(icon, to: 18)
-                btn.image?.isTemplate = false
-                btn.imagePosition = .imageLeading
-                btn.alphaValue = running ? 1 : 0.35
-                let attr = badgeString(badge)
-                btn.attributedTitle = attr
-                btn.title = attr.string
-                let textWidth = max(0, (attr.string as NSString).size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]).width)
-                item.length = badge == 0 ? max(18, ceil(textWidth)) : 20 + ceil(textWidth)
-                btn.toolTip = name
+                configure(item, name: name, icon: icon, running: running, badge: badge)
             } else {
                 let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
                 item.autosaveName = "BadgeOnBar_\(bundleID)"
+                configure(item, name: name, icon: icon, running: running, badge: badge)
                 let btn = item.button!
-                btn.image = resizedIcon(icon, to: 18)
-                btn.imagePosition = .imageLeading
-                btn.alphaValue = running ? 1 : 0.35
-                let attr = badgeString(badge)
-                btn.attributedTitle = attr
-                btn.title = attr.string
-                let textWidth = max(0, (attr.string as NSString).size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]).width)
-                item.length = badge == 0 ? max(18, ceil(textWidth)) : 20 + ceil(textWidth)
-                btn.toolTip = name
                 btn.target = self
                 btn.action = #selector(clicked(_:))
-                btn.sendAction(on: .leftMouseUp)
-
+                btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
                 items[bundleID] = item
             }
         }
     }
 
+    private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, running: Bool, badge: Int) {
+        let btn = item.button!
+        btn.image = resizedIcon(icon, to: 18)
+        btn.image?.isTemplate = false
+        btn.imagePosition = .imageLeading
+        btn.alphaValue = running ? 1 : 0.35
+        let attr = badgeString(badge)
+        btn.attributedTitle = attr
+        btn.title = attr.string
+        let textWidth = max(0, (attr.string as NSString).size(
+            withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]
+        ).width)
+        item.length = badge == 0 ? max(18, ceil(textWidth)) : 20 + ceil(textWidth)
+        btn.toolTip = name
+    }
+
     @objc private func clicked(_ sender: NSStatusBarButton) {
         guard let (id, _) = items.first(where: { $0.value.button == sender }) else { return }
+        if let event = NSApp.currentEvent,
+           event.type == .rightMouseUp || event.modifierFlags.contains(.option) {
+            onShowConfig?()
+            return
+        }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
         }
@@ -99,4 +102,3 @@ final class StatusBarManager {
         return (name, icon)
     }
 }
-

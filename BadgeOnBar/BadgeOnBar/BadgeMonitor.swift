@@ -4,18 +4,6 @@ import OSLog
 
 private let monLog = Logger(subsystem: "com.grahamotte.badgeonbar", category: "BadgeMonitor")
 
-struct AppBadgeInfo: Identifiable, Equatable {
-    let bundleID: String
-    let name: String
-    let icon: NSImage?
-
-    var id: String { bundleID }
-
-    static func == (lhs: AppBadgeInfo, rhs: AppBadgeInfo) -> Bool {
-        lhs.bundleID == rhs.bundleID
-    }
-}
-
 @MainActor
 @Observable
 final class BadgeMonitor {
@@ -42,7 +30,7 @@ final class BadgeMonitor {
         refreshRunningApps()
         reloadDockElements()
         readBadges()
-        notifyUpdate()
+        publish()
 
         timer = Timer.scheduledTimer(
             timeInterval: 1.0,
@@ -90,42 +78,35 @@ final class BadgeMonitor {
 
     @objc nonisolated private func timerFired() {
         MainActor.assumeIsolated {
-            if dockAppElements.isEmpty {
-                refreshRunningApps()
-                reloadDockElements()
-            }
-            readBadges()
-            notifyUpdate()
+            if dockAppElements.isEmpty { fullRefresh() }
+            else { readBadges(); publish() }
         }
     }
 
     @objc nonisolated private func appLaunched() {
-        MainActor.assumeIsolated {
-            refreshRunningApps()
-            reloadDockElements()
-            readBadges()
-            notifyUpdate()
-        }
+        MainActor.assumeIsolated { fullRefresh() }
     }
 
     @objc nonisolated private func appTerminated() {
-        MainActor.assumeIsolated {
-            refreshRunningApps()
-            reloadDockElements()
-            readBadges()
-            notifyUpdate()
-        }
+        MainActor.assumeIsolated { fullRefresh() }
     }
 
     @objc nonisolated private func dockChanged() {
         MainActor.assumeIsolated {
             reloadDockElements()
             readBadges()
-            notifyUpdate()
+            publish()
         }
     }
 
-    private func notifyUpdate() {
+    private func fullRefresh() {
+        refreshRunningApps()
+        reloadDockElements()
+        readBadges()
+        publish()
+    }
+
+    private func publish() {
         onUpdate?()
     }
 

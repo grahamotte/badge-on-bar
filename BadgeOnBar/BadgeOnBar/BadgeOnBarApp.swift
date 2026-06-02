@@ -1,12 +1,14 @@
 import SwiftUI
 import AppKit
 
+private let configWindowID = "config"
+
 @main
 struct BadgeOnBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        Window("Badge on Bar", id: "config") {
+        Window("Badge on Bar", id: configWindowID) {
             ConfigurationView()
                 .environment(appDelegate.settings)
                 .environment(appDelegate.monitor)
@@ -22,19 +24,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusBarManager: StatusBarManager?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
+        NSApp.setActivationPolicy(.accessory)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBarManager = StatusBarManager(settings: settings, monitor: monitor)
+        statusBarManager?.onShowConfig = { [weak self] in self?.showConfigWindow() }
         monitor.start()
         PermissionsManager.checkOrPrompt()
-
-        NSApp.activate(ignoringOtherApps: true)
-
-        DispatchQueue.main.async { [weak self] in
-            self?.attachWindowDelegate()
-        }
+        attachWindowDelegate()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -52,20 +50,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
-        NSApp.setActivationPolicy(.accessory)
         return false
     }
 
     func showConfigWindow() {
-        NSApp.setActivationPolicy(.regular)
-        if let window = NSApp.windows.first(where: { $0.title == "Badge on Bar" }) {
+        for window in NSApp.windows where window.identifier?.rawValue == configWindowID {
             window.makeKeyAndOrderFront(nil)
+            return
         }
-        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func attachWindowDelegate() {
-        for window in NSApp.windows where window.title == "Badge on Bar" {
+        for window in NSApp.windows where window.identifier?.rawValue == configWindowID {
             window.delegate = self
             window.isReleasedWhenClosed = false
             window.makeKeyAndOrderFront(nil)
