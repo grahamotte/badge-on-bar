@@ -50,10 +50,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
         return false
     }
 
     func showConfigWindow() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
         for window in NSApp.windows where window.identifier?.rawValue == configWindowID {
             window.makeKeyAndOrderFront(nil)
             return
@@ -64,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for window in NSApp.windows where window.identifier?.rawValue == configWindowID {
             window.delegate = self
             window.isReleasedWhenClosed = false
-            window.makeKeyAndOrderFront(nil)
+            showConfigWindow()
             return
         }
     }
