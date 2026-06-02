@@ -107,7 +107,8 @@ final class StatusBarManager {
         guard let icon else { return nil }
         let canvas = NSSize(width: iconSize, height: iconSize)
         let drawIconSize = badge > 0 ? iconSize - 2 : iconSize
-        let iconRect = NSRect(x: 0, y: 0, width: drawIconSize, height: drawIconSize)
+        let offset = (iconSize - drawIconSize) / 2
+        let iconRect = NSRect(x: offset, y: offset, width: drawIconSize, height: drawIconSize)
         return NSImage(size: canvas, flipped: false) { _ in
             if badge > 0 {
                 icon.draw(in: iconRect)
