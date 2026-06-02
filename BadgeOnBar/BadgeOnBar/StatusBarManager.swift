@@ -1,5 +1,18 @@
 import AppKit
 
+private let statusItemLength: CGFloat = 20
+private let iconSize: CGFloat = 20
+
+private extension NSImage {
+    func grayOut() -> NSImage? {
+        guard let cgImage = cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        guard let grayscale = NSBitmapImageRep(cgImage: cgImage).converting(to: .genericGray, renderingIntent: .default) else { return nil }
+        let grayImage = NSImage(size: size)
+        grayImage.addRepresentation(grayscale)
+        return grayImage
+    }
+}
+
 @MainActor
 final class StatusBarManager {
     private let settings: AppSettings
@@ -32,7 +45,7 @@ final class StatusBarManager {
             if let item = items[bundleID] {
                 configure(item, name: name, icon: icon, running: running, badge: badge)
             } else {
-                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                let item = NSStatusBar.system.statusItem(withLength: statusItemLength)
                 item.autosaveName = "BadgeOnBar_\(bundleID)"
                 configure(item, name: name, icon: icon, running: running, badge: badge)
                 let btn = item.button!
@@ -46,18 +59,14 @@ final class StatusBarManager {
 
     private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, running: Bool, badge: Int) {
         let btn = item.button!
-        btn.image = resizedIcon(icon, to: 18)
+        btn.image = drawMenuBarIcon(icon: icon, badge: badge)
         btn.image?.isTemplate = false
-        btn.imagePosition = .imageLeading
+        btn.imagePosition = .imageOnly
         btn.alphaValue = running ? 1 : 0.35
-        let attr = badgeString(badge)
-        btn.attributedTitle = attr
-        btn.title = attr.string
-        let textWidth = max(0, (attr.string as NSString).size(
-            withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]
-        ).width)
-        item.length = badge == 0 ? max(18, ceil(textWidth)) : 20 + ceil(textWidth)
-        btn.toolTip = name
+        btn.title = ""
+        btn.attributedTitle = NSAttributedString()
+        item.length = statusItemLength
+        btn.toolTip = badge > 0 ? "\(name): \(badge)" : name
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
@@ -72,24 +81,40 @@ final class StatusBarManager {
         }
     }
 
-    private func resizedIcon(_ icon: NSImage?, to size: CGFloat) -> NSImage? {
+    private func drawMenuBarIcon(icon: NSImage?, badge: Int) -> NSImage? {
         guard let icon else { return nil }
-        let s = NSSize(width: size, height: size)
-        let image = NSImage(size: s, flipped: false) { _ in
-            icon.draw(in: NSRect(origin: .zero, size: s))
+        let canvas = NSSize(width: iconSize, height: iconSize)
+        let drawIconSize = badge > 0 ? iconSize - 2 : iconSize
+        let iconRect = NSRect(x: 0, y: 0, width: drawIconSize, height: drawIconSize)
+        return NSImage(size: canvas, flipped: false) { _ in
+            if badge > 0 {
+                icon.draw(in: iconRect)
+                self.drawBadgeDot(count: badge, canvasSize: canvas)
+            } else {
+                (icon.grayOut() ?? icon).draw(in: iconRect)
+            }
             return true
         }
-        image.isTemplate = false
-        return image
     }
 
-    private func badgeString(_ count: Int) -> NSAttributedString {
-        guard count > 0 else { return NSAttributedString() }
+    private func drawBadgeDot(count: Int, canvasSize: NSSize) {
         let text = count > 99 ? "99+" : "\(count)"
-        return NSAttributedString(string: text, attributes: [
-            .font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize),
-            .foregroundColor: NSColor.systemRed
-        ])
+        let font = NSFont.boldSystemFont(ofSize: 7)
+        let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let textSize = (text as NSString).size(withAttributes: attr)
+        let diameter = max(textSize.width, textSize.height) + 4
+        let badgeSize = NSSize(width: diameter, height: diameter)
+
+        let badgeOrigin = NSPoint(x: canvasSize.width - badgeSize.width,
+                                   y: canvasSize.height - badgeSize.height)
+        let oval = NSRect(origin: badgeOrigin, size: badgeSize)
+
+        NSColor.systemRed.withAlphaComponent(0.9).setFill()
+        NSBezierPath(ovalIn: oval).fill()
+
+        let tx = oval.minX + (diameter - textSize.width) / 2
+        let ty = oval.minY + (diameter - textSize.height) / 2
+        (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attr)
     }
 
     private func resolve(_ bundleID: String, runningApp: AppBadgeInfo?) -> (String, NSImage?) {
