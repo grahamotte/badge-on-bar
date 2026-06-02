@@ -2,6 +2,7 @@ import AppKit
 
 private let statusItemLength: CGFloat = 20
 private let iconSize: CGFloat = 20
+private let demoBundleID = "__demo__"
 
 private extension NSImage {
     func grayOut() -> NSImage? {
@@ -31,7 +32,7 @@ final class StatusBarManager {
     func sync() {
         let monitored = settings.monitoredBundleIDs
 
-        for id in items.keys where !monitored.contains(id) {
+        for id in items.keys where id != demoBundleID && !monitored.contains(id) {
             NSStatusBar.system.removeStatusItem(items[id]!)
             items[id] = nil
         }
@@ -55,6 +56,26 @@ final class StatusBarManager {
                 items[bundleID] = item
             }
         }
+
+        if settings.demoModeEnabled {
+            let demoIcon = NSImage(named: NSImage.applicationIconName)
+            let badge = settings.demoBadgeCount
+            if let item = items[demoBundleID] {
+                configure(item, name: "Demo", icon: demoIcon, running: true, badge: badge)
+            } else {
+                let item = NSStatusBar.system.statusItem(withLength: statusItemLength)
+                item.autosaveName = "BadgeOnBar_\(demoBundleID)"
+                configure(item, name: "Demo", icon: demoIcon, running: true, badge: badge)
+                let btn = item.button!
+                btn.target = self
+                btn.action = #selector(clicked(_:))
+                btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
+                items[demoBundleID] = item
+            }
+        } else if let item = items[demoBundleID] {
+            NSStatusBar.system.removeStatusItem(item)
+            items[demoBundleID] = nil
+        }
     }
 
     private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, running: Bool, badge: Int) {
@@ -66,7 +87,7 @@ final class StatusBarManager {
         btn.title = ""
         btn.attributedTitle = NSAttributedString()
         item.length = statusItemLength
-        btn.toolTip = badge > 0 ? "\(name): \(badge)" : name
+        btn.toolTip = badge > 0 ? "\(name): \(min(badge, 99))" : name
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
@@ -76,6 +97,7 @@ final class StatusBarManager {
             onShowConfig?()
             return
         }
+        if id == demoBundleID { return }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
         }
@@ -98,7 +120,7 @@ final class StatusBarManager {
     }
 
     private func drawBadgeDot(count: Int, canvasSize: NSSize) {
-        let text = count > 99 ? "99+" : "\(count)"
+        let text = "\(min(count, 99))"
         let font = NSFont.boldSystemFont(ofSize: 7)
         let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
         let textSize = (text as NSString).size(withAttributes: attr)

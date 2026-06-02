@@ -113,7 +113,12 @@ private struct SettingsDetailView: View {
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        let badgeBinding = Binding(
+            get: { settings.demoBadgeCount },
+            set: { settings.setDemoBadgeCount($0) }
+        )
+
+        return VStack(alignment: .leading, spacing: 24) {
             Text("General")
                 .font(.title2)
                 .fontWeight(.semibold)
@@ -130,6 +135,32 @@ private struct SettingsDetailView: View {
                 }
             }
             .toggleStyle(.switch)
+
+            Divider()
+
+            Toggle(isOn: Binding(
+                get: { settings.demoModeEnabled },
+                set: { settings.setDemoMode($0) }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Demo Mode")
+                    Text("Show a demo app in the menu bar to preview badges")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+
+            if settings.demoModeEnabled {
+                HStack {
+                    Text("Badge Count:")
+                    TextField("1", value: badgeBinding, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 64)
+                    Stepper("", value: badgeBinding, in: 0...999)
+                        .labelsHidden()
+                }
+            }
 
             Spacer()
         }
