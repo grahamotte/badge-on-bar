@@ -1,38 +1,25 @@
 import AppKit
-import OSLog
-
-private let sbLog = Logger(subsystem: "com.grahamotte.badgeonbar", category: "StatusBar")
 
 @MainActor
 final class StatusBarManager {
     private let settings: AppSettings
     private let monitor: BadgeMonitor
     private var items: [String: NSStatusItem] = [:]
-    private var syncTimer: Timer?
 
     init(settings: AppSettings, monitor: BadgeMonitor) {
         self.settings = settings
         self.monitor = monitor
-        monitor.onUpdate = { [weak self] in self?.updateStatusItems() }
-        settings.onChanged = { [weak self] in self?.updateStatusItems() }
-        updateStatusItems()
-        startSyncTimer()
+        monitor.onUpdate = { [weak self] in self?.sync() }
+        settings.onChanged = { [weak self] in self?.sync() }
+        sync()
     }
 
-    private func startSyncTimer() {
-        syncTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.updateStatusItems()
-            }
-        }
-    }
-
-    func updateStatusItems() {
+    func sync() {
         let monitored = settings.monitoredBundleIDs
 
-        for (bundleID, item) in items where !monitored.contains(bundleID) {
-            sbLog.info("hiding status item for \(bundleID, privacy: .public)")
-            item.length = 0
+        for id in items.keys where !monitored.contains(id) {
+            NSStatusBar.system.removeStatusItem(items[id]!)
+            items[id] = nil
         }
 
         for bundleID in monitored {
@@ -41,31 +28,37 @@ final class StatusBarManager {
             let appInfo = monitor.availableApps.first { $0.bundleID == bundleID }
             let (name, icon) = resolve(bundleID, runningApp: appInfo)
 
-            let item: NSStatusItem
-            if let existing = items[bundleID] {
-                item = existing
-            } else {
-                sbLog.info("creating status item for \(bundleID, privacy: .public)")
-                item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            if let item = items[bundleID] {
                 let btn = item.button!
+                btn.image = resizedIcon(icon, to: 18)
+                btn.image?.isTemplate = false
+                btn.imagePosition = .imageLeading
+                btn.alphaValue = running ? 1 : 0.35
+                let attr = badgeString(badge)
+                btn.attributedTitle = attr
+                btn.title = attr.string
+                let textWidth = max(0, (attr.string as NSString).size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]).width)
+                item.length = badge == 0 ? max(18, ceil(textWidth)) : 20 + ceil(textWidth)
+                btn.toolTip = name
+            } else {
+                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                item.autosaveName = "BadgeOnBar_\(bundleID)"
+                let btn = item.button!
+                btn.image = resizedIcon(icon, to: 18)
+                btn.imagePosition = .imageLeading
+                btn.alphaValue = running ? 1 : 0.35
+                let attr = badgeString(badge)
+                btn.attributedTitle = attr
+                btn.title = attr.string
+                let textWidth = max(0, (attr.string as NSString).size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]).width)
+                item.length = badge == 0 ? max(18, ceil(textWidth)) : 20 + ceil(textWidth)
+                btn.toolTip = name
                 btn.target = self
                 btn.action = #selector(clicked(_:))
                 btn.sendAction(on: .leftMouseUp)
+
                 items[bundleID] = item
             }
-
-            let btn = item.button!
-            let rIcon = resizedIcon(icon, to: 18)
-            btn.image = rIcon
-            btn.image?.isTemplate = false
-            btn.imagePosition = .imageLeading
-            btn.alphaValue = running ? 1 : 0.35
-            let attr = badgeString(badge)
-            btn.attributedTitle = attr
-            btn.title = attr.string
-            let textWidth = max(0, (attr.string as NSString).size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]).width)
-            item.length = badge == 0 ? max(18, ceil(textWidth)) : 20 + ceil(textWidth)
-            btn.toolTip = name
         }
     }
 

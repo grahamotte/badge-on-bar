@@ -223,7 +223,6 @@ final class BadgeMonitor {
 
     private func resolveDockTitle(_ title: String, element: AXUIElement) -> AppBadgeInfo? {
         if let bid = bundleIDFromElement(element) {
-            monLog.info("resolveDockTitle '\(title, privacy: .public)' → bundleID \(bid, privacy: .public)")
             if let running = availableApps.first(where: { $0.bundleID == bid }) {
                 return running
             }
@@ -235,7 +234,6 @@ final class BadgeMonitor {
         }
 
         if let app = availableApps.first(where: { $0.name == title }) {
-            monLog.info("resolveDockTitle '\(title, privacy: .public)' → matched running app: \(app.bundleID, privacy: .public)")
             return app
         }
 
@@ -244,14 +242,10 @@ final class BadgeMonitor {
                   let bundle = Bundle(url: url) else { continue }
             let cfName = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
                 ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
-            if cfName == title {
-                monLog.info("resolveDockTitle '\(title, privacy: .public)' → matched by CFBundleName: \(app.bundleID, privacy: .public)")
-                return app
-            }
+            if cfName == title { return app }
         }
 
         if let (bundleID, name) = installedAppRegistry[title] {
-            monLog.info("resolveDockTitle '\(title, privacy: .public)' → matched installed registry: \(bundleID, privacy: .public)")
             var icon: NSImage?
             if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 icon = NSWorkspace.shared.icon(forFile: url.path)
@@ -259,7 +253,6 @@ final class BadgeMonitor {
             return AppBadgeInfo(bundleID: bundleID, name: name, icon: icon)
         }
 
-        monLog.warning("resolveDockTitle '\(title, privacy: .public)' → no match found")
         return nil
     }
 

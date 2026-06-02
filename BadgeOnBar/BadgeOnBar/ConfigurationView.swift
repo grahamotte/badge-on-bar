@@ -1,9 +1,6 @@
 import SwiftUI
 import AppKit
 import Combine
-import OSLog
-
-private let cfgLog = Logger(subsystem: "com.grahamotte.badgeonbar", category: "ConfigView")
 
 struct ConfigurationView: View {
     @Environment(AppSettings.self) private var settings
@@ -82,7 +79,6 @@ struct ConfigurationView: View {
             ))
         }
 
-        cfgLog.debug("monitoredApps list: \(apps.map { "\($0.name):\($0.bundleID)".debugDescription }.joined(separator: ", "), privacy: .public)")
         return apps
     }
 }
@@ -102,10 +98,7 @@ private struct MonitoredAppRow: View {
     var body: some View {
         let binding = Binding(
             get: { settings.isMonitored(app.bundleID) },
-            set: { newValue in
-                cfgLog.info("toggle '\(app.name, privacy: .public)' (\(app.bundleID, privacy: .public)) → \(newValue)")
-                settings.setMonitored(app.bundleID, monitored: newValue)
-            }
+            set: { settings.setMonitored(app.bundleID, monitored: $0) }
         )
         HStack(spacing: 8) {
             if let icon = app.icon {
@@ -145,10 +138,7 @@ private struct MonitoredAppDetailView: View {
     var body: some View {
         let binding = Binding(
             get: { settings.isMonitored(app.bundleID) },
-            set: { newValue in
-                cfgLog.info("detail toggle '\(app.name, privacy: .public)' (\(app.bundleID, privacy: .public)) → \(newValue)")
-                settings.setMonitored(app.bundleID, monitored: newValue)
-            }
+            set: { settings.setMonitored(app.bundleID, monitored: $0) }
         )
         VStack(spacing: 24) {
             if let icon = app.icon {
