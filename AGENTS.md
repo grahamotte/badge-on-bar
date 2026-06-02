@@ -8,7 +8,7 @@ This is a modern, native SwiftUI rewrite of [Doll](https://github.com/xiaogdgenu
 
 ## UX
 
-- The app lives entirely in the menu bar. No Dock icon (`LSUIElement = YES`), no persistent window. Activation policy is always `.accessory`.
+- The app lives primarily in the menu bar. When no window is open, there is no Dock icon (`LSUIElement = YES`, `.accessory` activation policy). When the config window opens, the activation policy switches to `.regular` so the app appears in the Dock and can become the foreground app.
 - A configuration window opens automatically on first launch. After that, right-click or Option-click any monitored app's menu bar item to reopen it.
 - Each monitored app gets its own icon + badge in the menu bar.
 - Left-click a monitored app's menu bar item to open that app. Right-click or Option-click to open the configuration window.
@@ -116,7 +116,7 @@ BadgeMonitor (@Observable)                 AppSettings (@Observable)
 - Target the latest stable macOS major version.
 - Strongly prefer native window and control styling.
 - The app entry point uses `@main App` with `NSApplicationDelegate` for status bar lifecycle management.
-- The activation policy is always `.accessory` — never switch to `.regular`.
+- The activation policy is `.accessory` when no window is open. Switch to `.regular` (and call `NSApp.activate(ignoringOtherApps: true)`) when showing the config window, and back to `.accessory` when the window closes.
 
 ## Workflow
 
@@ -152,6 +152,22 @@ These must be called on the same run-loop cycle or macOS layout breaks. No `Disp
 
 When resizing icons for the menu bar, do not round-trip through TIFF. Some app icons (PDF-based, certain color profiles) will fail the TIFF conversion, producing a nil image and an invisible menu bar item. Draw directly into a new `NSImage(size:)` instead.
 
-### App activation policy must stay .accessory
+### App activation policy toggles between .accessory and .regular
 
-Never call `NSApp.setActivationPolicy(.regular)` or `NSApp.activate(ignoringOtherApps: true)`. The app is a menu bar accessory (`LSUIElement = YES`). Changing the policy to `.regular` creates a Dock icon, which contradicts the UX. The config window can be shown via `window.makeKeyAndOrderFront(nil)` without changing activation policy.
+When no window is open, the activation policy must be `.accessory` so the app has no Dock icon (a pure menu bar accessory). When showing the config window, switch to `.regular` and call `NSApp.activate(ignoringOtherApps: true)` so the app gets a Dock icon and its menu bar appears while the window is in focus. Switch back to `.accessory` when the window is closed (`windowShouldClose`).
+
+```swift
+func showConfigWindow() {
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+    // ... show window
+}
+
+func windowShouldClose(_ sender: NSWindow) -> Bool {
+    sender.orderOut(nil)
+    NSApp.setActivationPolicy(.accessory)
+    return false
+}
+```
+
+Do not leave the app in `.regular` after the window closes — it leaves a stale Dock icon.
