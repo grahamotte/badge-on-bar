@@ -73,3 +73,24 @@ SwiftUI window for managing which apps to monitor and adjusting preferences.
 - Keep recommendations practical and biased toward momentum.
 - Choose options that feel native, simple, and easy to evolve.
 - Ignore Doll's settings UI — it sucks and should not be used as a reference. However, Doll's main app code (badge monitoring, status bar management, permissions) is a useful implementation reference. The Doll source is available as a git submodule at `Doll/`.
+
+## Gotchas
+
+### NSStatusItem.autosaveName is mandatory
+
+When managing multiple `NSStatusItem` instances, each one **must** have a unique `autosaveName`. Without it, macOS cannot distinguish between items and will silently reuse, reorder, or remove them when you create/destroy other items. This manifests as "removing one app's toggle deletes a different app from the menu bar."
+
+```swift
+// REQUIRED — without this, items collide
+item.autosaveName = "BadgeOnBar_\(bundleID)"
+```
+
+Doll does the same: `statusItem.autosaveName = "Doll_\(app.bundleId)"`. Do not skip this.
+
+### Do not call removeStatusItem and statusItem(withLength:) in deferred/dispatched blocks
+
+These must be called on the same run-loop cycle or macOS layout breaks. No `DispatchQueue.main.async` wrappers, no deferred creation passes. Remove old items and create new items synchronously in one pass.
+
+### NSImage.tiffRepresentation can silently return nil
+
+When resizing icons for the menu bar, do not round-trip through TIFF. Some app icons (PDF-based, certain color profiles) will fail the TIFF conversion, producing a nil image and an invisible menu bar item. Draw directly into a new `NSImage(size:)` instead.
