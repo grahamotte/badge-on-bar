@@ -63,15 +63,13 @@ struct ConfigurationView: View {
 
     private var monitoredApps: [MonitoredApp] {
         let dockIDs = Set(monitor.dockApps.map(\.bundleID))
-        let runningIDs = Set(monitor.availableApps.map(\.bundleID))
         var apps: [MonitoredApp] = []
 
         for info in monitor.dockApps {
             apps.append(MonitoredApp(
                 bundleID: info.bundleID,
                 name: info.name,
-                icon: info.icon,
-                isRunning: runningIDs.contains(info.bundleID)
+                icon: info.icon
             ))
         }
 
@@ -85,8 +83,7 @@ struct ConfigurationView: View {
             apps.append(MonitoredApp(
                 bundleID: bundleID,
                 name: name,
-                icon: icon,
-                isRunning: runningIDs.contains(bundleID)
+                icon: icon
             ))
         }
 
@@ -173,7 +170,6 @@ private struct MonitoredApp: Identifiable {
     let bundleID: String
     let name: String
     let icon: NSImage?
-    let isRunning: Bool
     var id: String { bundleID }
 }
 
@@ -191,22 +187,15 @@ private struct MonitoredAppRow: View {
                 Image(nsImage: icon)
                     .resizable()
                     .frame(width: 20, height: 20)
-                    .opacity(app.isRunning ? 1 : 0.35)
             } else {
                 Image(systemName: "app.fill")
                     .resizable()
                     .frame(width: 20, height: 20)
                     .foregroundStyle(.secondary)
-                    .opacity(app.isRunning ? 1 : 0.35)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(app.name)
                     .lineLimit(1)
-                if !app.isRunning {
-                    Text("Not running")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
             }
             Spacer()
             Toggle("", isOn: binding)
@@ -231,7 +220,6 @@ private struct MonitoredAppDetailView: View {
                 Image(nsImage: icon)
                     .resizable()
                     .frame(width: 64, height: 64)
-                    .opacity(app.isRunning ? 1 : 0.35)
             } else {
                 Image(systemName: "app.fill")
                     .resizable()
@@ -245,12 +233,6 @@ private struct MonitoredAppDetailView: View {
             Text(app.bundleID)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-            if !app.isRunning {
-                Text("App is not currently running")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
 
             Toggle(isOn: binding) {
                 Text(binding.wrappedValue ? "Showing in menu bar" : "Show in menu bar")

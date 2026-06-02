@@ -38,17 +38,16 @@ final class StatusBarManager {
         }
 
         for bundleID in monitored {
-            let running = monitor.availableApps.contains { $0.bundleID == bundleID }
             let badge = monitor.badges[bundleID] ?? 0
             let appInfo = monitor.availableApps.first { $0.bundleID == bundleID }
             let (name, icon) = resolve(bundleID, runningApp: appInfo)
 
             if let item = items[bundleID] {
-                configure(item, name: name, icon: icon, running: running, badge: badge)
+                configure(item, name: name, icon: icon, badge: badge)
             } else {
                 let item = NSStatusBar.system.statusItem(withLength: statusItemLength)
                 item.autosaveName = "BadgeOnBar_\(bundleID)"
-                configure(item, name: name, icon: icon, running: running, badge: badge)
+                configure(item, name: name, icon: icon, badge: badge)
                 let btn = item.button!
                 btn.target = self
                 btn.action = #selector(clicked(_:))
@@ -61,11 +60,11 @@ final class StatusBarManager {
             let demoIcon = NSImage(named: NSImage.applicationIconName)
             let badge = settings.demoBadgeCount
             if let item = items[demoBundleID] {
-                configure(item, name: "Demo", icon: demoIcon, running: true, badge: badge)
+                configure(item, name: "Demo", icon: demoIcon, badge: badge)
             } else {
                 let item = NSStatusBar.system.statusItem(withLength: statusItemLength)
                 item.autosaveName = "BadgeOnBar_\(demoBundleID)"
-                configure(item, name: "Demo", icon: demoIcon, running: true, badge: badge)
+                configure(item, name: "Demo", icon: demoIcon, badge: badge)
                 let btn = item.button!
                 btn.target = self
                 btn.action = #selector(clicked(_:))
@@ -78,12 +77,11 @@ final class StatusBarManager {
         }
     }
 
-    private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, running: Bool, badge: Int) {
+    private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, badge: Int) {
         let btn = item.button!
         btn.image = drawMenuBarIcon(icon: icon, badge: badge)
         btn.image?.isTemplate = false
         btn.imagePosition = .imageOnly
-        btn.alphaValue = running ? 1 : 0.35
         btn.title = ""
         btn.attributedTitle = NSAttributedString()
         item.length = statusItemLength
