@@ -1,7 +1,7 @@
 import AppKit
 
-private let statusItemLength: CGFloat = 20
-private let iconSize: CGFloat = 20
+private let statusItemLength: CGFloat = 22
+private let iconSize: CGFloat = 22
 private let demoBundleID = "__demo__"
 
 private extension NSImage {
@@ -121,10 +121,10 @@ final class StatusBarManager {
 
     private func drawBadgeDot(count: Int, canvasSize: NSSize) {
         let text = "\(min(count, 99))"
-        let font = NSFont.boldSystemFont(ofSize: 7)
+        let font = NSFont.boldSystemFont(ofSize: 8)
         let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
         let textSize = (text as NSString).size(withAttributes: attr)
-        let diameter = max(textSize.width, textSize.height) + 4
+        let diameter = max(textSize.width, textSize.height) + 5
         let badgeSize = NSSize(width: diameter, height: diameter)
 
         let badgeOrigin = NSPoint(x: canvasSize.width - badgeSize.width,
