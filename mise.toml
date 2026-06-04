@@ -1,3 +1,6 @@
+[env]
+_.file = '.env'
+
 [tasks.build]
 description = "Build Badge on Bar and copy to dist/"
 run = "BADGEONBAR_OPEN_FINDER=1 ./scripts/build.sh"
@@ -11,7 +14,7 @@ description = "Open BadgeOnBar.xcodeproj in Xcode"
 run = "open BadgeOnBar/BadgeOnBar.xcodeproj"
 
 [tasks.publish]
-description = "Archive and upload Badge on Bar to App Store Connect"
+description = "Archive, upload to App Store Connect, sign for Developer ID, notarize, and publish to Codeberg Releases"
 run = "./scripts/publish.sh"
 
 [tasks.push]
