@@ -86,18 +86,11 @@ echo "=== Uploading to App Store Connect ==="
 rm -rf "$ASC_EXPORT_DIR"
 mkdir -p "$ASC_EXPORT_DIR"
 
-ASC_AUTH_ARGS=(
-  -authenticationKeyPath "$KEY_FILE"
-  -authenticationKeyID "$APPLE_KEY_ID"
-  -authenticationKeyIssuerID "$APPLE_ISSUER_ID"
-)
-
 if xcodebuild -exportArchive \
   -archivePath "$ARCHIVE_PATH" \
   -exportPath "$ASC_EXPORT_DIR" \
   -exportOptionsPlist "$ASC_EXPORT_OPTIONS" \
-  -allowProvisioningUpdates \
-  "${ASC_AUTH_ARGS[@]}"; then
+  -allowProvisioningUpdates; then
   APP_STORE_SUCCEEDED=1
   echo "App Store Connect upload succeeded."
 else
@@ -120,10 +113,17 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
+# --- Create ZIP ---
+echo
+echo "Creating ZIP for notarization..."
+rm -f "$ZIP_PATH"
+ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+echo "Created: $ZIP_PATH"
+
 # --- Notarize ---
 echo
 echo "Submitting for notarization..."
-xcrun notarytool submit "$APP_PATH" \
+xcrun notarytool submit "$ZIP_PATH" \
   --key "$KEY_FILE" \
   --key-id "$APPLE_KEY_ID" \
   --issuer "$APPLE_ISSUER_ID" \
@@ -132,13 +132,6 @@ xcrun notarytool submit "$APP_PATH" \
 echo "Stapling notarization ticket..."
 xcrun stapler staple "$APP_PATH"
 echo "Notarization complete."
-
-# --- Create ZIP ---
-echo
-echo "Creating ZIP..."
-rm -f "$ZIP_PATH"
-ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
-echo "Created: $ZIP_PATH"
 
 # --- Push git tag ---
 TAG="v$VERSION"

@@ -3,6 +3,7 @@
 /dist
 /BadgeOnBar.app
 /Packages
+/certs
 xcuserdata/
 xcuserdata/
 *.xcuserstate
