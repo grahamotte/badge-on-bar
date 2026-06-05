@@ -14,7 +14,7 @@ description = "Open BadgeOnBar.xcodeproj in Xcode"
 run = "open BadgeOnBar/BadgeOnBar.xcodeproj"
 
 [tasks.publish]
-description = "Archive, upload to App Store Connect, sign for Developer ID, notarize, and publish to Codeberg Releases"
+description = "Archive, sign for Developer ID, notarize, and publish to Codeberg Releases"
 run = "./scripts/publish.sh"
 
 [tasks.push]

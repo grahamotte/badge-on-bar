@@ -10,20 +10,17 @@ trap cleanup EXIT
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/BadgeOnBar/BadgeOnBar.xcodeproj"
-ASC_EXPORT_OPTIONS="$ROOT_DIR/scripts/ExportOptions-AppStoreConnect.plist"
 DID_EXPORT_OPTIONS="$ROOT_DIR/scripts/ExportOptions-DeveloperID.plist"
 ARCHIVE_PATH="$ROOT_DIR/dist/archives/BadgeOnBar.xcarchive"
-ASC_EXPORT_DIR="$ROOT_DIR/dist/export/AppStore"
 DID_EXPORT_DIR="$ROOT_DIR/dist/export/DeveloperID"
 ZIP_PATH="$ROOT_DIR/dist/BadgeOnBar.zip"
 CODEBERG_OWNER="grahamotte"
 CODEBERG_REPO="badge-on-bar"
-APP_STORE_SUCCEEDED=0
 
 usage() {
   echo "Usage: $0"
   echo
-  echo "Publishes to both App Store Connect and Codeberg from a single archive."
+  echo "Archives, signs for Developer ID, notarizes, and publishes to Codeberg Releases."
   echo
   echo "Required environment variables:"
   echo "  CODEBERG_TOKEN         Codeberg personal access token (repository scope)"
@@ -67,8 +64,8 @@ if [[ -z "$VERSION" ]]; then
 fi
 echo "Version: $VERSION"
 
-# --- Archive (once, for both destinations) ---
-mkdir -p "$(dirname "$ARCHIVE_PATH")" "$ASC_EXPORT_DIR" "$DID_EXPORT_DIR"
+# --- Archive ---
+mkdir -p "$(dirname "$ARCHIVE_PATH")" "$DID_EXPORT_DIR"
 
 echo "Archiving Badge on Bar (Release)..."
 rm -rf "$ARCHIVE_PATH"
@@ -80,24 +77,7 @@ xcodebuild archive \
   -archivePath "$ARCHIVE_PATH" \
   -allowProvisioningUpdates
 
-# --- 1. Upload to App Store Connect (best-effort) ---
-echo
-echo "=== Uploading to App Store Connect ==="
-rm -rf "$ASC_EXPORT_DIR"
-mkdir -p "$ASC_EXPORT_DIR"
-
-if xcodebuild -exportArchive \
-  -archivePath "$ARCHIVE_PATH" \
-  -exportPath "$ASC_EXPORT_DIR" \
-  -exportOptionsPlist "$ASC_EXPORT_OPTIONS" \
-  -allowProvisioningUpdates; then
-  APP_STORE_SUCCEEDED=1
-  echo "App Store Connect upload succeeded."
-else
-  echo "App Store Connect upload FAILED (continuing with Codeberg release)."
-fi
-
-# --- 2. Export Developer ID signed app ---
+# --- Export Developer ID signed app ---
 echo
 echo "=== Exporting Developer ID signed app ==="
 rm -rf "$DID_EXPORT_DIR"
@@ -190,8 +170,3 @@ echo "Uploaded: $ASSET_NAME"
 echo
 echo "=== Published v$VERSION ==="
 echo "Codeberg release: https://codeberg.org/$CODEBERG_OWNER/$CODEBERG_REPO/releases/tag/$TAG"
-if [[ "$APP_STORE_SUCCEEDED" -eq 1 ]]; then
-  echo "App Store Connect: uploaded"
-else
-  echo "App Store Connect: upload FAILED (check manually)"
-fi
