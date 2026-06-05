@@ -16,14 +16,17 @@ DID_EXPORT_DIR="$ROOT_DIR/dist/export/DeveloperID"
 ZIP_PATH="$ROOT_DIR/dist/BadgeOnBar.zip"
 CODEBERG_OWNER="grahamotte"
 CODEBERG_REPO="badge-on-bar"
+GITHUB_OWNER="grahamotte"
+GITHUB_REPO="badge-on-bar"
 
 usage() {
   echo "Usage: $0"
   echo
-  echo "Archives, signs for Developer ID, notarizes, and publishes to Codeberg Releases."
+  echo "Archives, signs for Developer ID, notarizes, and publishes to Codeberg and GitHub Releases."
   echo
   echo "Required environment variables:"
   echo "  CODEBERG_TOKEN         Codeberg personal access token (repository scope)"
+  echo "  GITHUB_TOKEN           GitHub personal access token (repo scope)"
   echo "  APPLE_KEY_ID           App Store Connect API key ID"
   echo "  APPLE_KEY_P8_BASE64    Base64-encoded App Store Connect API key .p8 file"
   echo "  APPLE_ISSUER_ID        App Store Connect API issuer ID"
@@ -37,6 +40,7 @@ fi
 
 missing=()
 [[ -z "${CODEBERG_TOKEN:-}" ]] && missing+=("CODEBERG_TOKEN")
+[[ -z "${GITHUB_TOKEN:-}" ]] && missing+=("GITHUB_TOKEN")
 [[ -z "${APPLE_KEY_ID:-}" ]] && missing+=("APPLE_KEY_ID")
 [[ -z "${APPLE_KEY_P8_BASE64:-}" ]] && missing+=("APPLE_KEY_P8_BASE64")
 [[ -z "${APPLE_ISSUER_ID:-}" ]] && missing+=("APPLE_ISSUER_ID")
@@ -121,9 +125,11 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "Tag $TAG already exists — deleting and recreating"
   git tag -d "$TAG"
   git push origin ":refs/tags/$TAG" 2>/dev/null || true
+  git push origin_backup ":refs/tags/$TAG" 2>/dev/null || true
 fi
 git tag "$TAG"
 git push origin "$TAG"
+git push origin_backup "$TAG"
 
 # --- Create Codeberg release ---
 echo
@@ -166,7 +172,49 @@ if [[ -z "$ASSET_NAME" ]]; then
 fi
 echo "Uploaded: $ASSET_NAME"
 
+# --- Create GitHub release ---
+echo
+echo "=== Creating GitHub release $TAG ==="
+
+GITHUB_RELEASE_RESPONSE=$(curl -sS -X POST \
+  "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  -d "{
+    \"tag_name\": \"$TAG\",
+    \"name\": \"$TAG\",
+    \"body\": \"Badge on Bar $VERSION\",
+    \"draft\": false,
+    \"prerelease\": false
+  }" || true)
+
+GITHUB_RELEASE_ID=$(echo "$GITHUB_RELEASE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+if [[ -z "$GITHUB_RELEASE_ID" ]]; then
+  echo "Failed to create GitHub release. Response:"
+  echo "$GITHUB_RELEASE_RESPONSE"
+  exit 1
+fi
+echo "GitHub release $TAG created, ID: $GITHUB_RELEASE_ID"
+
+echo "Uploading BadgeOnBar.zip to GitHub release $GITHUB_RELEASE_ID..."
+GITHUB_ASSET_RESPONSE=$(curl -sS -X POST \
+  "https://uploads.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/$GITHUB_RELEASE_ID/assets?name=BadgeOnBar.zip" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/zip" \
+  --data-binary "@$ZIP_PATH" || true)
+
+GITHUB_ASSET_NAME=$(echo "$GITHUB_ASSET_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null)
+if [[ -z "$GITHUB_ASSET_NAME" ]]; then
+  echo "Failed to upload GitHub asset. Response:"
+  echo "$GITHUB_ASSET_RESPONSE"
+  exit 1
+fi
+echo "Uploaded to GitHub: $GITHUB_ASSET_NAME"
+
 # --- Summary ---
 echo
 echo "=== Published v$VERSION ==="
 echo "Codeberg release: https://codeberg.org/$CODEBERG_OWNER/$CODEBERG_REPO/releases/tag/$TAG"
+echo "GitHub release: https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/tag/$TAG"
