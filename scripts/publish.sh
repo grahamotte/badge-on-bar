@@ -148,6 +148,7 @@ git push origin "$TAG"
 # --- Create Codeberg release ---
 echo
 echo "=== Creating Codeberg release $TAG ==="
+sleep 2
 
 RELEASE_RESPONSE=$(curl -sS -X POST \
   "https://codeberg.org/api/v1/repos/$CODEBERG_OWNER/$CODEBERG_REPO/releases" \
@@ -159,7 +160,7 @@ RELEASE_RESPONSE=$(curl -sS -X POST \
     \"body\": \"Badge on Bar $VERSION\",
     \"draft\": false,
     \"prerelease\": false
-  }")
+  }" || true)
 
 RELEASE_ID=$(echo "$RELEASE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
 if [[ -z "$RELEASE_ID" ]]; then
@@ -175,7 +176,7 @@ ASSET_RESPONSE=$(curl -sS -X POST \
   "https://codeberg.org/api/v1/repos/$CODEBERG_OWNER/$CODEBERG_REPO/releases/$RELEASE_ID/assets" \
   -H "Authorization: token $CODEBERG_TOKEN" \
   -H "Content-Type: multipart/form-data" \
-  -F "attachment=@$ZIP_PATH")
+  -F "attachment=@$ZIP_PATH" || true)
 
 ASSET_NAME=$(echo "$ASSET_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null)
 if [[ -z "$ASSET_NAME" ]]; then
