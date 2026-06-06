@@ -3,6 +3,7 @@ import AppKit
 private let statusItemLength: CGFloat = 18
 private let iconSize: CGFloat = 18
 private let badgeViewTag = 9731
+private let badgeRed = NSColor.systemRed.withAlphaComponent(0.9)
 
 private extension NSImage {
     func grayOut() -> NSImage? {
@@ -62,37 +63,17 @@ final class StatusBarManager {
 
     private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, badge: Int, bundleID: String) {
         let btn = item.button!
-        let dotBadge = settings.isDotBadge(bundleID)
-
         removeBadge(from: btn)
-
-        if let symbolName = settings.symbolOverride(for: bundleID),
-           let symbolIcon = NSImage(systemSymbolName: symbolName, accessibilityDescription: name)?
-            .withSymbolConfiguration(.init(pointSize: iconSize, weight: .medium)) {
-
-            let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
-            let fitRect = aspectFitRect(for: symbolIcon, in: canvasRect)
-            let canvasImage = NSImage(size: canvasRect.size, flipped: false) { _ in
-                symbolIcon.draw(in: fitRect)
-                return true
-            }
-            canvasImage.isTemplate = true
-            btn.image = canvasImage
-
-            if badge > 0 || badge == -1 {
-                addBadge(to: btn, badge: badge, dotBadge: dotBadge)
-            }
-        } else if let icon {
-            let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
-            btn.image = compositeIcon(icon: icon, badge: badge, iconRect: canvasRect, dotBadge: dotBadge)
-        } else {
-            btn.image = nil
-        }
-
+        btn.image = statusIcon(name: name, icon: icon, badge: badge, bundleID: bundleID)
         btn.imagePosition = .imageOnly
         btn.title = ""
         btn.attributedTitle = NSAttributedString()
         item.length = statusItemLength
+
+        if let overlay = badgeOverlay(for: badge, bundleID: bundleID) {
+            addBadge(overlay, to: btn)
+        }
+
         let tip: String = {
             if badge > 0 { return "\(name): \(min(badge, 99))" }
             if badge == -1 { return "\(name): \u{00B7}" }
@@ -113,18 +94,42 @@ final class StatusBarManager {
         }
     }
 
-    // MARK: - Badge subview
+    // MARK: - Rendering
 
-    private func addBadge(to button: NSStatusBarButton, badge: Int, dotBadge: Bool) {
-        let badgeImage: NSImage
-        if dotBadge {
-            badgeImage = Self.dotBadgeImage()
-        } else if badge == -1 {
-            badgeImage = Self.interpunctBadgeImage()
-        } else {
-            badgeImage = Self.countBadgeImage(count: badge)
+    private enum BadgeOverlay {
+        case dot
+        case text(String)
+        case centerDot
+
+        var isCornerDot: Bool {
+            if case .dot = self { return true }
+            return false
+        }
+    }
+
+    private func statusIcon(name: String, icon: NSImage?, badge: Int, bundleID: String) -> NSImage? {
+        if let symbolName = settings.symbolOverride(for: bundleID),
+           let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: name)?
+            .withSymbolConfiguration(.init(pointSize: iconSize, weight: .medium)) {
+            let image = fittedImage(symbol)
+            image.isTemplate = true
+            return image
         }
 
+        guard let icon else { return nil }
+        let image = fittedImage(icon)
+        return badge == 0 ? image.grayOut() ?? image : image
+    }
+
+    private func badgeOverlay(for badge: Int, bundleID: String) -> BadgeOverlay? {
+        guard badge > 0 || badge == -1 else { return nil }
+        if settings.isDotBadge(bundleID) { return .dot }
+        if badge == -1 { return .centerDot }
+        return .text("\(min(badge, 99))")
+    }
+
+    private func addBadge(_ overlay: BadgeOverlay, to button: NSStatusBarButton) {
+        let badgeImage = Self.badgeImage(overlay)
         let diameter = badgeImage.size.width
         let margin: CGFloat = 1
         let btnW = max(button.bounds.width, statusItemLength)
@@ -133,7 +138,7 @@ final class StatusBarManager {
         let imgY = (btnH - iconSize) / 2
 
         let frame: NSRect
-        if dotBadge {
+        if overlay.isCornerDot {
             frame = NSRect(x: imgX + iconSize - diameter - margin,
                            y: imgY + margin,
                            width: diameter,
@@ -156,134 +161,65 @@ final class StatusBarManager {
         button.subviews.first(where: { $0.tag == badgeViewTag })?.removeFromSuperview()
     }
 
-    private static func dotBadgeImage() -> NSImage {
-        let diameter: CGFloat = 8
-        return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
-            NSColor.systemRed.withAlphaComponent(0.9).setFill()
-            NSBezierPath(ovalIn: rect).fill()
+    private func fittedImage(_ source: NSImage) -> NSImage {
+        let canvas = NSSize(width: iconSize, height: iconSize)
+        let rect = aspectFitRect(for: source, in: NSRect(origin: .zero, size: canvas))
+        return NSImage(size: canvas, flipped: false) { _ in
+            source.draw(in: rect)
             return true
         }
     }
 
-    private static func countBadgeImage(count: Int) -> NSImage {
-        let text = "\(min(count, 99))"
-        let font = NSFont.boldSystemFont(ofSize: 8)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        let diameter = max(textSize.width, textSize.height) + 4
+    private static func badgeImage(_ overlay: BadgeOverlay) -> NSImage {
+        if case .dot = overlay {
+            let diameter: CGFloat = 8
+            return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+                badgeRed.setFill()
+                NSBezierPath(ovalIn: rect).fill()
+                return true
+            }
+        }
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.boldSystemFont(ofSize: 8),
+            .foregroundColor: NSColor.white
+        ]
+        let text: String? = {
+            if case .text(let text) = overlay { return text }
+            return nil
+        }()
+        let sizingText = text ?? "1"
+        let textSize = (sizingText as NSString).size(withAttributes: attrs)
+        let diameter = max(10, max(textSize.width, textSize.height) + 4)
+
         return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
-            NSColor.systemRed.withAlphaComponent(0.9).setFill()
+            badgeRed.setFill()
             NSBezierPath(ovalIn: rect).fill()
-            let tx = rect.midX - textSize.width / 2
-            let ty = rect.midY - textSize.height / 2
-            (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attrs)
+
+            switch overlay {
+            case .centerDot:
+                let dotDiameter: CGFloat = 3
+                let dotRect = NSRect(x: rect.midX - dotDiameter / 2,
+                                     y: rect.midY - dotDiameter / 2,
+                                     width: dotDiameter,
+                                     height: dotDiameter)
+                NSColor.white.setFill()
+                NSBezierPath(ovalIn: dotRect).fill()
+            case .text(let text):
+                let point = NSPoint(x: rect.midX - textSize.width / 2, y: rect.midY - textSize.height / 2)
+                (text as NSString).draw(at: point, withAttributes: attrs)
+            case .dot:
+                break
+            }
             return true
         }
     }
-
-    private static func interpunctBadgeImage() -> NSImage {
-        let text = "\u{00B7}"
-        let font = NSFont.boldSystemFont(ofSize: 8)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        let diameter = max(textSize.width, textSize.height) + 4
-        return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
-            NSColor.systemRed.withAlphaComponent(0.9).setFill()
-            NSBezierPath(ovalIn: rect).fill()
-            let tx = rect.midX - textSize.width / 2
-            let ty = rect.midY - textSize.height / 2
-            (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attrs)
-            return true
-        }
-    }
-
-    // MARK: - Drawing helpers
 
     private func aspectFitRect(for image: NSImage, in rect: NSRect) -> NSRect {
         guard image.size.width > 0, image.size.height > 0 else { return rect }
         let scale = min(rect.width / image.size.width, rect.height / image.size.height)
         let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
         return NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height)
-    }
-
-    private func compositeIcon(icon: NSImage?, badge: Int, iconRect: NSRect, dotBadge: Bool) -> NSImage? {
-        guard let icon else { return nil }
-        let canvas = NSSize(width: iconSize, height: iconSize)
-        return NSImage(size: canvas, flipped: false) { _ in
-            if badge == 0 {
-                (self.renderedIcon(icon, in: iconRect, canvas: canvas).grayOut() ?? icon).draw(in: NSRect(origin: .zero, size: canvas))
-            } else {
-                icon.draw(in: iconRect)
-            }
-
-            if badge > 0 || badge == -1 {
-                if dotBadge {
-                    Self.drawDotOnly(canvasSize: canvas)
-                } else if badge == -1 {
-                    Self.drawInterpunct(canvasSize: canvas)
-                } else {
-                    Self.drawBadgeDot(count: badge, canvasSize: canvas)
-                }
-            }
-            return true
-        }
-    }
-
-    private func renderedIcon(_ icon: NSImage, in rect: NSRect, canvas: NSSize) -> NSImage {
-        NSImage(size: canvas, flipped: false) { _ in
-            icon.draw(in: rect)
-            return true
-        }
-    }
-
-    private static func drawDotOnly(canvasSize: NSSize) {
-        let diameter: CGFloat = 8
-        let margin: CGFloat = 1
-        let origin = NSPoint(x: canvasSize.width - diameter - margin,
-                             y: canvasSize.height - diameter - margin)
-        let oval = NSRect(origin: origin, size: NSSize(width: diameter, height: diameter))
-        NSColor.systemRed.withAlphaComponent(0.9).setFill()
-        NSBezierPath(ovalIn: oval).fill()
-    }
-
-    private static func drawInterpunct(canvasSize: NSSize) {
-        let text = "\u{00B7}"
-        let font = NSFont.boldSystemFont(ofSize: 8)
-        let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
-        let textSize = (text as NSString).size(withAttributes: attr)
-        let diameter = max(textSize.width, textSize.height) + 4
-        let badgeSize = NSSize(width: diameter, height: diameter)
-
-        let badgeOrigin = NSPoint(x: (canvasSize.width - badgeSize.width) / 2,
-                                   y: (canvasSize.height - badgeSize.height) / 2)
-        let oval = NSRect(origin: badgeOrigin, size: badgeSize)
-
-        NSColor.systemRed.withAlphaComponent(0.9).setFill()
-        NSBezierPath(ovalIn: oval).fill()
-
-        let tx = oval.minX + (diameter - textSize.width) / 2
-        let ty = oval.minY + (diameter - textSize.height) / 2
-        (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attr)
-    }
-
-    private static func drawBadgeDot(count: Int, canvasSize: NSSize) {
-        let text = "\(min(count, 99))"
-        let font = NSFont.boldSystemFont(ofSize: 8)
-        let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
-        let textSize = (text as NSString).size(withAttributes: attr)
-        let diameter = max(textSize.width, textSize.height) + 4
-        let badgeSize = NSSize(width: diameter, height: diameter)
-
-        let badgeOrigin = NSPoint(x: (canvasSize.width - badgeSize.width) / 2,
-                                   y: (canvasSize.height - badgeSize.height) / 2)
-        let oval = NSRect(origin: badgeOrigin, size: badgeSize)
-
-        NSColor.systemRed.withAlphaComponent(0.9).setFill()
-        NSBezierPath(ovalIn: oval).fill()
-
-        let tx = oval.minX + (diameter - textSize.width) / 2
-        let ty = oval.minY + (diameter - textSize.height) / 2
-        (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attr)
     }
 
     private func resolve(_ bundleID: String, runningApp: AppBadgeInfo?) -> (String, NSImage?) {
