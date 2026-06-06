@@ -46,16 +46,18 @@ final class StatusBarManager {
 
     func sync() {
         let monitored = settings.monitoredBundleIDs
+        let badges = Dictionary(uniqueKeysWithValues: monitored.map { ($0, settings.demoBadgeOverride ?? monitor.badges[$0] ?? 0) })
+        let visible = monitored.filter { settings.zeroBehavior(for: $0) != .hide || badges[$0, default: 0] != 0 }
 
-        for id in items.keys where !monitored.contains(id) {
+        for id in items.keys where !visible.contains(id) {
             if let item = items[id] {
                 NSStatusBar.system.removeStatusItem(item)
             }
             items[id] = nil
         }
 
-        for bundleID in monitored {
-            let badge = settings.demoBadgeOverride ?? monitor.badges[bundleID] ?? 0
+        for bundleID in visible {
+            let badge = badges[bundleID] ?? 0
             let appInfo = monitor.availableApps.first { $0.bundleID == bundleID }
             let (name, icon) = resolve(bundleID, runningApp: appInfo)
             configure(item(for: bundleID), name: name, icon: icon, badge: badge, bundleID: bundleID)
@@ -132,7 +134,7 @@ final class StatusBarManager {
 
         guard let icon else { return nil }
         let image = fittedImage(icon)
-        return badge == 0 ? image.grayOut() ?? image : image
+        return badge == 0 && settings.zeroBehavior(for: bundleID) == .greyscale ? image.grayOut() ?? image : image
     }
 
     private func badgeOverlay(for badge: Int, bundleID: String) -> BadgeOverlay? {

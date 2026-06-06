@@ -9,6 +9,13 @@ enum BadgeColorOption: String, CaseIterable, Identifiable {
     var name: String { rawValue.capitalized }
 }
 
+enum ZeroBehavior: String, CaseIterable, Identifiable {
+    case show, greyscale, hide
+
+    var id: String { rawValue }
+    var name: String { rawValue.capitalized }
+}
+
 @MainActor
 @Observable
 final class AppSettings {
@@ -19,6 +26,8 @@ final class AppSettings {
     var dotBadgeOverrides: [String: Bool] = [:]
     var badgeColorDefault: BadgeColorOption = .red
     var badgeColorOverrides: [String: BadgeColorOption] = [:]
+    var zeroBehaviorDefault: ZeroBehavior = .show
+    var zeroBehaviorOverrides: [String: ZeroBehavior] = [:]
     var symbolOverrides: [String: String] = [:]
 
     @ObservationIgnored private var demoTask: Task<Void, Never>?
@@ -30,6 +39,8 @@ final class AppSettings {
     private let dotBadgeDefaultKey = "dotBadgeDefault"
     private let badgeColorDefaultKey = "badgeColorDefault"
     private let badgeColorOverridesKey = "badgeColorOverrides"
+    private let zeroBehaviorDefaultKey = "zeroBehaviorDefault"
+    private let zeroBehaviorOverridesKey = "zeroBehaviorOverrides"
     private let symbolOverridesKey = "symbolOverrides"
 
     init() {
@@ -48,6 +59,13 @@ final class AppSettings {
         if let overrides = defaults.dictionary(forKey: badgeColorOverridesKey) as? [String: String] {
             badgeColorOverrides = overrides.compactMapValues(BadgeColorOption.init(rawValue:))
         }
+        if let rawDefault = defaults.string(forKey: zeroBehaviorDefaultKey),
+           let behavior = ZeroBehavior(rawValue: rawDefault) {
+            zeroBehaviorDefault = behavior
+        }
+        if let overrides = defaults.dictionary(forKey: zeroBehaviorOverridesKey) as? [String: String] {
+            zeroBehaviorOverrides = overrides.compactMapValues(ZeroBehavior.init(rawValue:))
+        }
         if let overrides = defaults.dictionary(forKey: symbolOverridesKey) as? [String: String] {
             symbolOverrides = overrides
         }
@@ -65,6 +83,9 @@ final class AppSettings {
         for bundleID in monitoredBundleIDs where badgeColorOverrides[bundleID] == nil {
             badgeColorOverrides[bundleID] = badgeColorDefault
         }
+        for bundleID in monitoredBundleIDs where zeroBehaviorOverrides[bundleID] == nil {
+            zeroBehaviorOverrides[bundleID] = zeroBehaviorDefault
+        }
     }
 
     func setMonitored(_ bundleID: String, monitored: Bool) {
@@ -72,15 +93,18 @@ final class AppSettings {
             monitoredBundleIDs.insert(bundleID)
             dotBadgeOverrides[bundleID] = dotBadgeDefault
             badgeColorOverrides[bundleID] = badgeColorDefault
+            zeroBehaviorOverrides[bundleID] = zeroBehaviorDefault
         } else {
             monitoredBundleIDs.remove(bundleID)
             dotBadgeOverrides.removeValue(forKey: bundleID)
             badgeColorOverrides.removeValue(forKey: bundleID)
+            zeroBehaviorOverrides.removeValue(forKey: bundleID)
             symbolOverrides.removeValue(forKey: bundleID)
         }
         save()
         persistDotBadge()
         persistBadgeColors()
+        persistZeroBehavior()
         persistSymbols()
         onChanged?()
     }
@@ -124,6 +148,27 @@ final class AppSettings {
         }
     }
 
+    func resetAllToDefaults() {
+        demoTask?.cancel()
+        demoBadgeOverride = nil
+        monitoredBundleIDs = []
+        dotBadgeDefault = false
+        dotBadgeOverrides = [:]
+        badgeColorDefault = .red
+        badgeColorOverrides = [:]
+        zeroBehaviorDefault = .show
+        zeroBehaviorOverrides = [:]
+        symbolOverrides = [:]
+        setStartAtLogin(false)
+        [
+            monitoredKey, dotBadgeOverridesKey, dotBadgeDefaultKey,
+            badgeColorDefaultKey, badgeColorOverridesKey,
+            zeroBehaviorDefaultKey, zeroBehaviorOverridesKey,
+            symbolOverridesKey, "dotBadgeBundleIDs"
+        ].forEach(defaults.removeObject(forKey:))
+        onChanged?()
+    }
+
     func isDotBadge(_ bundleID: String) -> Bool {
         dotBadgeOverrides[bundleID] ?? dotBadgeDefault
     }
@@ -141,6 +186,16 @@ final class AppSettings {
     func setBadgeColor(_ bundleID: String, color: BadgeColorOption) {
         badgeColorOverrides[bundleID] = color
         persistBadgeColors()
+        onChanged?()
+    }
+
+    func zeroBehavior(for bundleID: String) -> ZeroBehavior {
+        zeroBehaviorOverrides[bundleID] ?? zeroBehaviorDefault
+    }
+
+    func setZeroBehavior(_ bundleID: String, behavior: ZeroBehavior) {
+        zeroBehaviorOverrides[bundleID] = behavior
+        persistZeroBehavior()
         onChanged?()
     }
 
@@ -166,6 +221,12 @@ final class AppSettings {
         onChanged?()
     }
 
+    func setZeroBehaviorDefault(_ behavior: ZeroBehavior) {
+        zeroBehaviorDefault = behavior
+        defaults.set(behavior.rawValue, forKey: zeroBehaviorDefaultKey)
+        onChanged?()
+    }
+
     func setAllDotBadgesToDefault() {
         let monitored = monitoredBundleIDs
         for bundleID in monitored {
@@ -180,6 +241,14 @@ final class AppSettings {
             badgeColorOverrides[bundleID] = badgeColorDefault
         }
         persistBadgeColors()
+        onChanged?()
+    }
+
+    func setAllZeroBehaviorsToDefault() {
+        for bundleID in monitoredBundleIDs {
+            zeroBehaviorOverrides[bundleID] = zeroBehaviorDefault
+        }
+        persistZeroBehavior()
         onChanged?()
     }
 
@@ -201,12 +270,25 @@ final class AppSettings {
         return true
     }
 
+    var allZeroBehaviorsMatchDefault: Bool {
+        for bundleID in monitoredBundleIDs {
+            if zeroBehaviorOverrides[bundleID] != zeroBehaviorDefault {
+                return false
+            }
+        }
+        return true
+    }
+
     private func persistDotBadge() {
         defaults.set(dotBadgeOverrides, forKey: dotBadgeOverridesKey)
     }
 
     private func persistBadgeColors() {
         defaults.set(badgeColorOverrides.mapValues(\.rawValue), forKey: badgeColorOverridesKey)
+    }
+
+    private func persistZeroBehavior() {
+        defaults.set(zeroBehaviorOverrides.mapValues(\.rawValue), forKey: zeroBehaviorOverridesKey)
     }
 
     private func persistSymbols() {

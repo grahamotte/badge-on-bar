@@ -224,6 +224,26 @@ private struct SettingsDetailView: View {
                     .disabled(settings.allBadgeColorsMatchDefault)
                     .controlSize(.small)
                 }
+
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Zero Behavior")
+                            .fontWeight(.medium)
+                        Text("Choose how new apps appear when their badge is zero.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ZeroBehaviorPicker(selection: Binding(
+                        get: { settings.zeroBehaviorDefault },
+                        set: { settings.setZeroBehaviorDefault($0) }
+                    ))
+                    Button("Change All") {
+                        settings.setAllZeroBehaviorsToDefault()
+                    }
+                    .disabled(settings.allZeroBehaviorsMatchDefault)
+                    .controlSize(.small)
+                }
             }
 
             Divider()
@@ -239,6 +259,11 @@ private struct SettingsDetailView: View {
                         }
                         .controlSize(.small)
                     }
+
+                    Button("Reset All to Default") {
+                        settings.resetAllToDefaults()
+                    }
+                    .controlSize(.small)
                 }
             }
         }
@@ -340,10 +365,40 @@ private struct MonitoredAppDetailView: View {
                 ))
             }
 
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Zero Behavior")
+                        .fontWeight(.medium)
+                    Text("Choose how this app appears when its badge is zero.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                ZeroBehaviorPicker(selection: Binding(
+                    get: { settings.zeroBehavior(for: app.bundleID) },
+                    set: { settings.setZeroBehavior(app.bundleID, behavior: $0) }
+                ))
+            }
+
             Divider()
 
             MenuBarIconGrid(appIcon: app.icon, selection: symbolBinding)
         }
+    }
+}
+
+private struct ZeroBehaviorPicker: View {
+    let selection: Binding<ZeroBehavior>
+
+    var body: some View {
+        Picker("", selection: selection) {
+            ForEach(ZeroBehavior.allCases) { behavior in
+                Text(behavior.name).tag(behavior)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 210)
     }
 }
 
