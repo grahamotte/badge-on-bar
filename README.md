@@ -2,8 +2,6 @@
 
 Badge on Bar is a native macOS menu bar app that mirrors Dock badge counts into the menu bar.
 
-For notification zero people who have trust issues with hidden Dock badges.
-
 <p align="center">
   <img src="assets/screenshot.png" alt="Badge on Bar screenshot">
 </p>
