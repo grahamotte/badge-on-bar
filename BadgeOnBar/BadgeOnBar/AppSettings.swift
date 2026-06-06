@@ -17,7 +17,7 @@ enum ZeroBehavior: String, CaseIterable, Identifiable {
 }
 
 enum DisplayMode: String, CaseIterable, Identifiable {
-    case badge, dot, question
+    case badge, dot, count, question
 
     var id: String { rawValue }
     var name: String { rawValue.capitalized }

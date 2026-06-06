@@ -81,10 +81,11 @@ final class StatusBarManager {
         let btn = item.button!
         removeBadge(from: btn)
         btn.image = statusIcon(name: name, icon: icon, badge: badge, bundleID: bundleID)
-        btn.imagePosition = .imageOnly
+        let countTitle = countAttributedTitle(for: badge, bundleID: bundleID)
+        btn.imagePosition = countTitle.length > 0 ? .imageLeft : .imageOnly
         btn.title = ""
-        btn.attributedTitle = NSAttributedString()
-        item.length = statusItemLength
+        btn.attributedTitle = countTitle
+        item.length = countTitle.length > 0 ? NSStatusItem.variableLength : statusItemLength
 
         if let overlay = badgeOverlay(for: badge, bundleID: bundleID) {
             addBadge(overlay, color: settings.badgeColor(for: bundleID).nsColor, to: btn)
@@ -148,6 +149,8 @@ final class StatusBarManager {
         switch settings.displayMode(for: bundleID) {
         case .dot:
             return .dot
+        case .count:
+            return nil
         case .question:
             return nil
         case .badge:
@@ -155,6 +158,11 @@ final class StatusBarManager {
         }
         if badge == -1 { return .centerDot }
         return .text("\(min(badge, 99))")
+    }
+
+    private func countAttributedTitle(for badge: Int, bundleID: String) -> NSAttributedString {
+        guard settings.displayMode(for: bundleID) == .count, badge > 0 || badge == -1 else { return NSAttributedString() }
+        return NSAttributedString(string: " \(badge == -1 ? "\u{00B7}" : "\(badge)")", attributes: Self.countAttributes)
     }
 
     private func addBadge(_ overlay: BadgeOverlay, color: NSColor, to button: NSStatusBarButton) {
@@ -249,6 +257,12 @@ final class StatusBarManager {
             return true
         }
     }
+
+    private static let countAttributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: 14, weight: .regular),
+        .baselineOffset: -1,
+        .foregroundColor: NSColor.labelColor
+    ]
 
     private func aspectFitRect(for image: NSImage, in rect: NSRect) -> NSRect {
         guard image.size.width > 0, image.size.height > 0 else { return rect }
