@@ -2,6 +2,7 @@ import AppKit
 
 private let statusItemLength: CGFloat = 18
 private let iconSize: CGFloat = 18
+private let badgeViewTag = 9731
 
 private extension NSImage {
     func grayOut() -> NSImage? {
@@ -25,17 +26,6 @@ final class StatusBarManager {
         self.monitor = monitor
         monitor.onUpdate = { [weak self] in self?.sync() }
         settings.onChanged = { [weak self] in self?.sync() }
-
-        DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.sync()
-            }
-        }
-
         sync()
     }
 
@@ -73,31 +63,24 @@ final class StatusBarManager {
     private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, badge: Int, bundleID: String) {
         let btn = item.button!
         let dotBadge = settings.isDotBadge(bundleID)
-        let isDark = btn.effectiveAppearance.name.rawValue.lowercased().contains("dark")
+
+        removeBadge(from: btn)
 
         if let symbolName = settings.symbolOverride(for: bundleID),
            let symbolIcon = NSImage(systemSymbolName: symbolName, accessibilityDescription: name)?
             .withSymbolConfiguration(.init(pointSize: iconSize, weight: .medium)) {
 
-            symbolIcon.isTemplate = true
             let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
             let fitRect = aspectFitRect(for: symbolIcon, in: canvasRect)
-            let fillColor: NSColor = isDark ? .white : .black
-
-            btn.image = NSImage(size: canvasRect.size, flipped: false) { _ in
-                fillColor.setFill()
+            let canvasImage = NSImage(size: canvasRect.size, flipped: false) { _ in
                 symbolIcon.draw(in: fitRect)
-
-                if badge > 0 || badge == -1 {
-                    if dotBadge {
-                        Self.drawDotOnly(canvasSize: canvasRect.size)
-                    } else if badge == -1 {
-                        Self.drawInterpunct(canvasSize: canvasRect.size)
-                    } else {
-                        Self.drawBadgeDot(count: badge, canvasSize: canvasRect.size)
-                    }
-                }
                 return true
+            }
+            canvasImage.isTemplate = true
+            btn.image = canvasImage
+
+            if badge > 0 || badge == -1 {
+                addBadge(to: btn, badge: badge, dotBadge: dotBadge)
             }
         } else if let icon {
             let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
@@ -127,6 +110,90 @@ final class StatusBarManager {
         }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
+        }
+    }
+
+    // MARK: - Badge subview
+
+    private func addBadge(to button: NSStatusBarButton, badge: Int, dotBadge: Bool) {
+        let badgeImage: NSImage
+        if dotBadge {
+            badgeImage = Self.dotBadgeImage()
+        } else if badge == -1 {
+            badgeImage = Self.interpunctBadgeImage()
+        } else {
+            badgeImage = Self.countBadgeImage(count: badge)
+        }
+
+        let diameter = badgeImage.size.width
+        let margin: CGFloat = 1
+        let btnW = max(button.bounds.width, statusItemLength)
+        let btnH = max(button.bounds.height, iconSize)
+        let imgX = (btnW - iconSize) / 2
+        let imgY = (btnH - iconSize) / 2
+
+        let frame: NSRect
+        if dotBadge {
+            frame = NSRect(x: imgX + iconSize - diameter - margin,
+                           y: imgY + margin,
+                           width: diameter,
+                           height: diameter)
+        } else {
+            frame = NSRect(x: imgX + (iconSize - diameter) / 2,
+                           y: imgY + (iconSize - diameter) / 2,
+                           width: diameter,
+                           height: diameter)
+        }
+
+        let imageView = NSImageView(frame: frame)
+        imageView.tag = badgeViewTag
+        imageView.image = badgeImage
+        imageView.imageScaling = .scaleNone
+        button.addSubview(imageView)
+    }
+
+    private func removeBadge(from button: NSStatusBarButton) {
+        button.subviews.first(where: { $0.tag == badgeViewTag })?.removeFromSuperview()
+    }
+
+    private static func dotBadgeImage() -> NSImage {
+        let diameter: CGFloat = 8
+        return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+            NSColor.systemRed.withAlphaComponent(0.9).setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            return true
+        }
+    }
+
+    private static func countBadgeImage(count: Int) -> NSImage {
+        let text = "\(min(count, 99))"
+        let font = NSFont.boldSystemFont(ofSize: 8)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        let diameter = max(textSize.width, textSize.height) + 4
+        return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+            NSColor.systemRed.withAlphaComponent(0.9).setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            let tx = rect.midX - textSize.width / 2
+            let ty = rect.midY - textSize.height / 2
+            (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attrs)
+            return true
+        }
+    }
+
+    private static func interpunctBadgeImage() -> NSImage {
+        let text = "\u{00B7}"
+        let font = NSFont.boldSystemFont(ofSize: 8)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        let diameter = max(textSize.width, textSize.height) + 4
+        return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+            NSColor.systemRed.withAlphaComponent(0.9).setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            let tx = rect.midX - textSize.width / 2
+            let ty = rect.midY - textSize.height / 2
+            (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attrs)
+            return true
         }
     }
 
