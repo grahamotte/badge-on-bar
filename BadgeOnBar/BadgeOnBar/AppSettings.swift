@@ -2,6 +2,13 @@ import Foundation
 import Observation
 import ServiceManagement
 
+enum BadgeColorOption: String, CaseIterable, Identifiable {
+    case red, green, blue, purple, black, pink
+
+    var id: String { rawValue }
+    var name: String { rawValue.capitalized }
+}
+
 @MainActor
 @Observable
 final class AppSettings {
@@ -10,6 +17,8 @@ final class AppSettings {
     var demoBadgeOverride: Int?
     var dotBadgeDefault = false
     var dotBadgeOverrides: [String: Bool] = [:]
+    var badgeColorDefault: BadgeColorOption = .red
+    var badgeColorOverrides: [String: BadgeColorOption] = [:]
     var symbolOverrides: [String: String] = [:]
 
     @ObservationIgnored private var demoTask: Task<Void, Never>?
@@ -19,6 +28,8 @@ final class AppSettings {
     private let monitoredKey = "monitoredBundleIDs"
     private let dotBadgeOverridesKey = "dotBadgeOverrides"
     private let dotBadgeDefaultKey = "dotBadgeDefault"
+    private let badgeColorDefaultKey = "badgeColorDefault"
+    private let badgeColorOverridesKey = "badgeColorOverrides"
     private let symbolOverridesKey = "symbolOverrides"
 
     init() {
@@ -29,6 +40,13 @@ final class AppSettings {
         dotBadgeDefault = defaults.bool(forKey: dotBadgeDefaultKey)
         if let overrides = defaults.dictionary(forKey: dotBadgeOverridesKey) as? [String: Bool] {
             dotBadgeOverrides = overrides
+        }
+        if let rawDefault = defaults.string(forKey: badgeColorDefaultKey),
+           let color = BadgeColorOption(rawValue: rawDefault) {
+            badgeColorDefault = color
+        }
+        if let overrides = defaults.dictionary(forKey: badgeColorOverridesKey) as? [String: String] {
+            badgeColorOverrides = overrides.compactMapValues(BadgeColorOption.init(rawValue:))
         }
         if let overrides = defaults.dictionary(forKey: symbolOverridesKey) as? [String: String] {
             symbolOverrides = overrides
@@ -44,19 +62,25 @@ final class AppSettings {
         for bundleID in monitoredBundleIDs where dotBadgeOverrides[bundleID] == nil {
             dotBadgeOverrides[bundleID] = dotBadgeDefault
         }
+        for bundleID in monitoredBundleIDs where badgeColorOverrides[bundleID] == nil {
+            badgeColorOverrides[bundleID] = badgeColorDefault
+        }
     }
 
     func setMonitored(_ bundleID: String, monitored: Bool) {
         if monitored {
             monitoredBundleIDs.insert(bundleID)
             dotBadgeOverrides[bundleID] = dotBadgeDefault
+            badgeColorOverrides[bundleID] = badgeColorDefault
         } else {
             monitoredBundleIDs.remove(bundleID)
             dotBadgeOverrides.removeValue(forKey: bundleID)
+            badgeColorOverrides.removeValue(forKey: bundleID)
             symbolOverrides.removeValue(forKey: bundleID)
         }
         save()
         persistDotBadge()
+        persistBadgeColors()
         persistSymbols()
         onChanged?()
     }
@@ -110,6 +134,16 @@ final class AppSettings {
         onChanged?()
     }
 
+    func badgeColor(for bundleID: String) -> BadgeColorOption {
+        badgeColorOverrides[bundleID] ?? badgeColorDefault
+    }
+
+    func setBadgeColor(_ bundleID: String, color: BadgeColorOption) {
+        badgeColorOverrides[bundleID] = color
+        persistBadgeColors()
+        onChanged?()
+    }
+
     func symbolOverride(for bundleID: String) -> String? {
         symbolOverrides[bundleID]
     }
@@ -126,12 +160,26 @@ final class AppSettings {
         onChanged?()
     }
 
+    func setBadgeColorDefault(_ color: BadgeColorOption) {
+        badgeColorDefault = color
+        defaults.set(color.rawValue, forKey: badgeColorDefaultKey)
+        onChanged?()
+    }
+
     func setAllDotBadgesToDefault() {
         let monitored = monitoredBundleIDs
         for bundleID in monitored {
             dotBadgeOverrides[bundleID] = dotBadgeDefault
         }
         persistDotBadge()
+        onChanged?()
+    }
+
+    func setAllBadgeColorsToDefault() {
+        for bundleID in monitoredBundleIDs {
+            badgeColorOverrides[bundleID] = badgeColorDefault
+        }
+        persistBadgeColors()
         onChanged?()
     }
 
@@ -144,8 +192,21 @@ final class AppSettings {
         return true
     }
 
+    var allBadgeColorsMatchDefault: Bool {
+        for bundleID in monitoredBundleIDs {
+            if badgeColorOverrides[bundleID] != badgeColorDefault {
+                return false
+            }
+        }
+        return true
+    }
+
     private func persistDotBadge() {
         defaults.set(dotBadgeOverrides, forKey: dotBadgeOverridesKey)
+    }
+
+    private func persistBadgeColors() {
+        defaults.set(badgeColorOverrides.mapValues(\.rawValue), forKey: badgeColorOverridesKey)
     }
 
     private func persistSymbols() {

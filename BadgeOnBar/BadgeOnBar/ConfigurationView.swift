@@ -17,6 +17,19 @@ private let menuBarSymbolOptions = [
     "mic.fill", "shield.fill",
 ]
 
+private extension BadgeColorOption {
+    var color: Color {
+        switch self {
+        case .red: .red
+        case .green: .green
+        case .blue: .blue
+        case .purple: Color(red: 0.36, green: 0.12, blue: 0.90)
+        case .black: .black
+        case .pink: Color(red: 1.00, green: 0.00, blue: 0.50)
+        }
+    }
+}
+
 struct ConfigurationView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(BadgeMonitor.self) private var monitor
@@ -191,6 +204,26 @@ private struct SettingsDetailView: View {
                     .disabled(settings.allDotBadgesMatchDefault)
                     .controlSize(.small)
                 }
+
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Badge Color")
+                            .fontWeight(.medium)
+                        Text("Choose the badge color for new apps.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    BadgeColorPicker(selection: Binding(
+                        get: { settings.badgeColorDefault },
+                        set: { settings.setBadgeColorDefault($0) }
+                    ))
+                    Button("Change All") {
+                        settings.setAllBadgeColorsToDefault()
+                    }
+                    .disabled(settings.allBadgeColorsMatchDefault)
+                    .controlSize(.small)
+                }
             }
 
             Divider()
@@ -292,9 +325,48 @@ private struct MonitoredAppDetailView: View {
                 )
             )
 
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Badge Color")
+                        .fontWeight(.medium)
+                    Text("Choose this app's badge color.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                BadgeColorPicker(selection: Binding(
+                    get: { settings.badgeColor(for: app.bundleID) },
+                    set: { settings.setBadgeColor(app.bundleID, color: $0) }
+                ))
+            }
+
             Divider()
 
             MenuBarIconGrid(appIcon: app.icon, selection: symbolBinding)
+        }
+    }
+}
+
+private struct BadgeColorPicker: View {
+    let selection: Binding<BadgeColorOption>
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(BadgeColorOption.allCases) { option in
+                Button {
+                    selection.wrappedValue = option
+                } label: {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(option.color)
+                        .frame(width: 18, height: 18)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(selection.wrappedValue == option ? Color.primary : Color.secondary.opacity(0.25), lineWidth: selection.wrappedValue == option ? 2 : 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(option.name)
+            }
         }
     }
 }

@@ -3,7 +3,21 @@ import AppKit
 private let statusItemLength: CGFloat = 18
 private let iconSize: CGFloat = 18
 private let badgeViewTag = 9731
-private let badgeRed = NSColor.systemRed.withAlphaComponent(0.9)
+
+private extension BadgeColorOption {
+    var nsColor: NSColor {
+        let color: NSColor
+        switch self {
+        case .red: color = .systemRed
+        case .green: color = .systemGreen
+        case .blue: color = .systemBlue
+        case .purple: color = NSColor(red: 0.36, green: 0.12, blue: 0.90, alpha: 1)
+        case .black: color = .black
+        case .pink: color = NSColor(red: 1.00, green: 0.00, blue: 0.50, alpha: 1)
+        }
+        return color.withAlphaComponent(0.9)
+    }
+}
 
 private extension NSImage {
     func grayOut() -> NSImage? {
@@ -71,7 +85,7 @@ final class StatusBarManager {
         item.length = statusItemLength
 
         if let overlay = badgeOverlay(for: badge, bundleID: bundleID) {
-            addBadge(overlay, to: btn)
+            addBadge(overlay, color: settings.badgeColor(for: bundleID).nsColor, to: btn)
         }
 
         let tip: String = {
@@ -128,8 +142,8 @@ final class StatusBarManager {
         return .text("\(min(badge, 99))")
     }
 
-    private func addBadge(_ overlay: BadgeOverlay, to button: NSStatusBarButton) {
-        let badgeImage = Self.badgeImage(overlay)
+    private func addBadge(_ overlay: BadgeOverlay, color: NSColor, to button: NSStatusBarButton) {
+        let badgeImage = Self.badgeImage(overlay, color: color)
         let diameter = badgeImage.size.width
         let margin: CGFloat = 1
         let btnW = max(button.bounds.width, statusItemLength)
@@ -170,11 +184,11 @@ final class StatusBarManager {
         }
     }
 
-    private static func badgeImage(_ overlay: BadgeOverlay) -> NSImage {
+    private static func badgeImage(_ overlay: BadgeOverlay, color: NSColor) -> NSImage {
         if case .dot = overlay {
             let diameter: CGFloat = 8
             return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
-                badgeRed.setFill()
+                color.setFill()
                 NSBezierPath(ovalIn: rect).fill()
                 return true
             }
@@ -193,7 +207,7 @@ final class StatusBarManager {
         let diameter = max(10, max(textSize.width, textSize.height) + 4)
 
         return NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
-            badgeRed.setFill()
+            color.setFill()
             NSBezierPath(ovalIn: rect).fill()
 
             switch overlay {
