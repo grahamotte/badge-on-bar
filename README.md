@@ -8,7 +8,7 @@ For notification zero people who have trust issues with hidden Dock badges.
   <img src="assets/screenshot.png" alt="Badge on Bar screenshot">
 </p>
 
-Badge on Bar is a modern native SwiftUI rewrite of [Doll](https://github.com/xiaogdgenuine/Doll).
+Badge on Bar is a rewrite of the fantastic [Doll](https://github.com/xiaogdgenuine/Doll) project.
 
 ## Contributing
 
