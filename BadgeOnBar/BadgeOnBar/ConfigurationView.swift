@@ -12,7 +12,9 @@ private let menuBarSymbolOptions = [
     "heart.fill", "bolt.fill", "flame.fill", "cloud.fill", "lock.fill",
     "key.fill", "shield.fill", "wifi.circle.fill", "terminal.fill", "gearshape.fill",
     "magnifyingglass.circle.fill", "circle.grid.hex.fill", "line.3.horizontal.decrease.circle.fill",
-    "grid.circle.fill", "hand.thumbsup.fill", "slash.circle.fill", "list.bullet", "smiley.fill"
+    "grid.circle.fill", "hand.thumbsup.fill", "slash.circle.fill", "list.bullet", "smiley.fill",
+    "text.badge.checkmark", "tortoise.fill", "bubble.right.fill", "bubble.left.and.bubble.right.fill",
+    "mic.fill", "shield.fill",
 ]
 
 struct ConfigurationView: View {
@@ -338,7 +340,7 @@ private struct IconChoiceButton<Content: View>: View {
     var body: some View {
         Button(action: action) {
             content
-                .foregroundStyle(isSelected ? .primary : .secondary)
+                .foregroundStyle(.secondary)
                 .frame(width: 32, height: 32)
                 .background(isSelected ? Color.accentColor.opacity(0.22) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
                 .overlay {

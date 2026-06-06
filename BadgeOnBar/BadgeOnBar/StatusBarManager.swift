@@ -25,6 +25,17 @@ final class StatusBarManager {
         self.monitor = monitor
         monitor.onUpdate = { [weak self] in self?.sync() }
         settings.onChanged = { [weak self] in self?.sync() }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.sync()
+            }
+        }
+
         sync()
     }
 
@@ -62,15 +73,38 @@ final class StatusBarManager {
     private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, badge: Int, bundleID: String) {
         let btn = item.button!
         let dotBadge = settings.isDotBadge(bundleID)
-        let symbolIcon = settings.symbolOverride(for: bundleID).flatMap {
-            NSImage(systemSymbolName: $0, accessibilityDescription: name)?
-                .withSymbolConfiguration(.init(pointSize: iconSize, weight: .medium))
-        }
-        let menuIcon = symbolIcon ?? icon
-        let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
-        let iconRect = symbolIcon.map { aspectFitRect(for: $0, in: canvasRect) } ?? canvasRect
+        let isDark = btn.effectiveAppearance.name.rawValue.lowercased().contains("dark")
 
-        btn.image = drawMenuBarIcon(icon: menuIcon, badge: badge, iconRect: iconRect, templateTint: symbolIcon != nil, dotBadge: dotBadge)
+        if let symbolName = settings.symbolOverride(for: bundleID),
+           let symbolIcon = NSImage(systemSymbolName: symbolName, accessibilityDescription: name)?
+            .withSymbolConfiguration(.init(pointSize: iconSize, weight: .medium)) {
+
+            symbolIcon.isTemplate = true
+            let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
+            let fitRect = aspectFitRect(for: symbolIcon, in: canvasRect)
+            let fillColor: NSColor = isDark ? .white : .black
+
+            btn.image = NSImage(size: canvasRect.size, flipped: false) { _ in
+                fillColor.setFill()
+                symbolIcon.draw(in: fitRect)
+
+                if badge > 0 || badge == -1 {
+                    if dotBadge {
+                        Self.drawDotOnly(canvasSize: canvasRect.size)
+                    } else if badge == -1 {
+                        Self.drawInterpunct(canvasSize: canvasRect.size)
+                    } else {
+                        Self.drawBadgeDot(count: badge, canvasSize: canvasRect.size)
+                    }
+                }
+                return true
+            }
+        } else if let icon {
+            let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
+            btn.image = compositeIcon(icon: icon, badge: badge, iconRect: canvasRect, dotBadge: dotBadge)
+        } else {
+            btn.image = nil
+        }
 
         btn.imagePosition = .imageOnly
         btn.title = ""
@@ -96,19 +130,20 @@ final class StatusBarManager {
         }
     }
 
-    private func drawMenuBarIcon(icon: NSImage?, badge: Int, iconRect: NSRect, templateTint: Bool, dotBadge: Bool) -> NSImage? {
+    // MARK: - Drawing helpers
+
+    private func aspectFitRect(for image: NSImage, in rect: NSRect) -> NSRect {
+        guard image.size.width > 0, image.size.height > 0 else { return rect }
+        let scale = min(rect.width / image.size.width, rect.height / image.size.height)
+        let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+        return NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height)
+    }
+
+    private func compositeIcon(icon: NSImage?, badge: Int, iconRect: NSRect, dotBadge: Bool) -> NSImage? {
         guard let icon else { return nil }
         let canvas = NSSize(width: iconSize, height: iconSize)
         return NSImage(size: canvas, flipped: false) { _ in
-            if templateTint {
-                icon.draw(in: iconRect)
-                guard let ctx = NSGraphicsContext.current else { return true }
-                ctx.saveGraphicsState()
-                ctx.compositingOperation = .sourceIn
-                NSColor.controlTextColor.setFill()
-                iconRect.fill()
-                ctx.restoreGraphicsState()
-            } else if badge == 0 {
+            if badge == 0 {
                 (self.renderedIcon(icon, in: iconRect, canvas: canvas).grayOut() ?? icon).draw(in: NSRect(origin: .zero, size: canvas))
             } else {
                 icon.draw(in: iconRect)
@@ -116,11 +151,11 @@ final class StatusBarManager {
 
             if badge > 0 || badge == -1 {
                 if dotBadge {
-                    self.drawDotOnly(canvasSize: canvas)
+                    Self.drawDotOnly(canvasSize: canvas)
                 } else if badge == -1 {
-                    self.drawInterpunct(canvasSize: canvas)
+                    Self.drawInterpunct(canvasSize: canvas)
                 } else {
-                    self.drawBadgeDot(count: badge, canvasSize: canvas)
+                    Self.drawBadgeDot(count: badge, canvasSize: canvas)
                 }
             }
             return true
@@ -134,14 +169,7 @@ final class StatusBarManager {
         }
     }
 
-    private func aspectFitRect(for image: NSImage, in rect: NSRect) -> NSRect {
-        guard image.size.width > 0, image.size.height > 0 else { return rect }
-        let scale = min(rect.width / image.size.width, rect.height / image.size.height)
-        let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
-        return NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height)
-    }
-
-    private func drawDotOnly(canvasSize: NSSize) {
+    private static func drawDotOnly(canvasSize: NSSize) {
         let diameter: CGFloat = 8
         let margin: CGFloat = 1
         let origin = NSPoint(x: canvasSize.width - diameter - margin,
@@ -151,7 +179,7 @@ final class StatusBarManager {
         NSBezierPath(ovalIn: oval).fill()
     }
 
-    private func drawInterpunct(canvasSize: NSSize) {
+    private static func drawInterpunct(canvasSize: NSSize) {
         let text = "\u{00B7}"
         let font = NSFont.boldSystemFont(ofSize: 8)
         let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
@@ -171,7 +199,7 @@ final class StatusBarManager {
         (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attr)
     }
 
-    private func drawBadgeDot(count: Int, canvasSize: NSSize) {
+    private static func drawBadgeDot(count: Int, canvasSize: NSSize) {
         let text = "\(min(count, 99))"
         let font = NSFont.boldSystemFont(ofSize: 8)
         let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
