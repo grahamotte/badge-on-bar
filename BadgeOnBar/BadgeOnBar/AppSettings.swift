@@ -16,14 +16,21 @@ enum ZeroBehavior: String, CaseIterable, Identifiable {
     var name: String { rawValue.capitalized }
 }
 
+enum DisplayMode: String, CaseIterable, Identifiable {
+    case badge, dot, question
+
+    var id: String { rawValue }
+    var name: String { rawValue.capitalized }
+}
+
 @MainActor
 @Observable
 final class AppSettings {
     var monitoredBundleIDs: Set<String> = []
     var startAtLogin = false
     var demoBadgeOverride: Int?
-    var dotBadgeDefault = false
-    var dotBadgeOverrides: [String: Bool] = [:]
+    var displayModeDefault: DisplayMode = .badge
+    var displayModeOverrides: [String: DisplayMode] = [:]
     var badgeColorDefault: BadgeColorOption = .red
     var badgeColorOverrides: [String: BadgeColorOption] = [:]
     var zeroBehaviorDefault: ZeroBehavior = .show
@@ -35,6 +42,8 @@ final class AppSettings {
 
     private let defaults = UserDefaults.standard
     private let monitoredKey = "monitoredBundleIDs"
+    private let displayModeDefaultKey = "displayModeDefault"
+    private let displayModeOverridesKey = "displayModeOverrides"
     private let dotBadgeOverridesKey = "dotBadgeOverrides"
     private let dotBadgeDefaultKey = "dotBadgeDefault"
     private let badgeColorDefaultKey = "badgeColorDefault"
@@ -48,9 +57,16 @@ final class AppSettings {
             monitoredBundleIDs = Set(ids)
         }
         refreshStartAtLoginStatus()
-        dotBadgeDefault = defaults.bool(forKey: dotBadgeDefaultKey)
-        if let overrides = defaults.dictionary(forKey: dotBadgeOverridesKey) as? [String: Bool] {
-            dotBadgeOverrides = overrides
+        if let rawDefault = defaults.string(forKey: displayModeDefaultKey),
+           let mode = DisplayMode(rawValue: rawDefault) {
+            displayModeDefault = mode
+        } else if defaults.object(forKey: dotBadgeDefaultKey) != nil {
+            displayModeDefault = defaults.bool(forKey: dotBadgeDefaultKey) ? .dot : .badge
+        }
+        if let overrides = defaults.dictionary(forKey: displayModeOverridesKey) as? [String: String] {
+            displayModeOverrides = overrides.compactMapValues(DisplayMode.init(rawValue:))
+        } else if let overrides = defaults.dictionary(forKey: dotBadgeOverridesKey) as? [String: Bool] {
+            displayModeOverrides = overrides.mapValues { $0 ? .dot : .badge }
         }
         if let rawDefault = defaults.string(forKey: badgeColorDefaultKey),
            let color = BadgeColorOption(rawValue: rawDefault) {
@@ -71,14 +87,14 @@ final class AppSettings {
         }
         if let ids = defaults.stringArray(forKey: "dotBadgeBundleIDs") {
             for id in ids {
-                dotBadgeOverrides[id] = true
+                displayModeOverrides[id] = .dot
             }
             defaults.removeObject(forKey: "dotBadgeBundleIDs")
-            persistDotBadge()
+            persistDisplayModes()
         }
 
-        for bundleID in monitoredBundleIDs where dotBadgeOverrides[bundleID] == nil {
-            dotBadgeOverrides[bundleID] = dotBadgeDefault
+        for bundleID in monitoredBundleIDs where displayModeOverrides[bundleID] == nil {
+            displayModeOverrides[bundleID] = displayModeDefault
         }
         for bundleID in monitoredBundleIDs where badgeColorOverrides[bundleID] == nil {
             badgeColorOverrides[bundleID] = badgeColorDefault
@@ -91,18 +107,18 @@ final class AppSettings {
     func setMonitored(_ bundleID: String, monitored: Bool) {
         if monitored {
             monitoredBundleIDs.insert(bundleID)
-            dotBadgeOverrides[bundleID] = dotBadgeDefault
+            displayModeOverrides[bundleID] = displayModeDefault
             badgeColorOverrides[bundleID] = badgeColorDefault
             zeroBehaviorOverrides[bundleID] = zeroBehaviorDefault
         } else {
             monitoredBundleIDs.remove(bundleID)
-            dotBadgeOverrides.removeValue(forKey: bundleID)
+            displayModeOverrides.removeValue(forKey: bundleID)
             badgeColorOverrides.removeValue(forKey: bundleID)
             zeroBehaviorOverrides.removeValue(forKey: bundleID)
             symbolOverrides.removeValue(forKey: bundleID)
         }
         save()
-        persistDotBadge()
+        persistDisplayModes()
         persistBadgeColors()
         persistZeroBehavior()
         persistSymbols()
@@ -152,8 +168,8 @@ final class AppSettings {
         demoTask?.cancel()
         demoBadgeOverride = nil
         monitoredBundleIDs = []
-        dotBadgeDefault = false
-        dotBadgeOverrides = [:]
+        displayModeDefault = .badge
+        displayModeOverrides = [:]
         badgeColorDefault = .red
         badgeColorOverrides = [:]
         zeroBehaviorDefault = .show
@@ -161,7 +177,8 @@ final class AppSettings {
         symbolOverrides = [:]
         setStartAtLogin(false)
         [
-            monitoredKey, dotBadgeOverridesKey, dotBadgeDefaultKey,
+            monitoredKey, displayModeDefaultKey, displayModeOverridesKey,
+            dotBadgeOverridesKey, dotBadgeDefaultKey,
             badgeColorDefaultKey, badgeColorOverridesKey,
             zeroBehaviorDefaultKey, zeroBehaviorOverridesKey,
             symbolOverridesKey, "dotBadgeBundleIDs"
@@ -169,13 +186,13 @@ final class AppSettings {
         onChanged?()
     }
 
-    func isDotBadge(_ bundleID: String) -> Bool {
-        dotBadgeOverrides[bundleID] ?? dotBadgeDefault
+    func displayMode(for bundleID: String) -> DisplayMode {
+        displayModeOverrides[bundleID] ?? displayModeDefault
     }
 
-    func setDotBadge(_ bundleID: String, enabled: Bool) {
-        dotBadgeOverrides[bundleID] = enabled
-        persistDotBadge()
+    func setDisplayMode(_ bundleID: String, mode: DisplayMode) {
+        displayModeOverrides[bundleID] = mode
+        persistDisplayModes()
         onChanged?()
     }
 
@@ -209,9 +226,9 @@ final class AppSettings {
         onChanged?()
     }
 
-    func setDotBadgeDefault(_ enabled: Bool) {
-        dotBadgeDefault = enabled
-        defaults.set(dotBadgeDefault, forKey: dotBadgeDefaultKey)
+    func setDisplayModeDefault(_ mode: DisplayMode) {
+        displayModeDefault = mode
+        defaults.set(mode.rawValue, forKey: displayModeDefaultKey)
         onChanged?()
     }
 
@@ -227,12 +244,12 @@ final class AppSettings {
         onChanged?()
     }
 
-    func setAllDotBadgesToDefault() {
+    func setAllDisplayModesToDefault() {
         let monitored = monitoredBundleIDs
         for bundleID in monitored {
-            dotBadgeOverrides[bundleID] = dotBadgeDefault
+            displayModeOverrides[bundleID] = displayModeDefault
         }
-        persistDotBadge()
+        persistDisplayModes()
         onChanged?()
     }
 
@@ -252,9 +269,9 @@ final class AppSettings {
         onChanged?()
     }
 
-    var allDotBadgesMatchDefault: Bool {
+    var allDisplayModesMatchDefault: Bool {
         for bundleID in monitoredBundleIDs {
-            if dotBadgeOverrides[bundleID] != dotBadgeDefault {
+            if displayModeOverrides[bundleID] != displayModeDefault {
                 return false
             }
         }
@@ -279,8 +296,8 @@ final class AppSettings {
         return true
     }
 
-    private func persistDotBadge() {
-        defaults.set(dotBadgeOverrides, forKey: dotBadgeOverridesKey)
+    private func persistDisplayModes() {
+        defaults.set(displayModeOverrides.mapValues(\.rawValue), forKey: displayModeOverridesKey)
     }
 
     private func persistBadgeColors() {

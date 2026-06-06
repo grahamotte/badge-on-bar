@@ -124,6 +124,12 @@ final class StatusBarManager {
     }
 
     private func statusIcon(name: String, icon: NSImage?, badge: Int, bundleID: String) -> NSImage? {
+        if badge != 0,
+           settings.displayMode(for: bundleID) == .question,
+           let question = questionImage() {
+            return question
+        }
+
         if let symbolName = settings.symbolOverride(for: bundleID),
            let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: name)?
             .withSymbolConfiguration(.init(pointSize: iconSize, weight: .medium)) {
@@ -139,7 +145,14 @@ final class StatusBarManager {
 
     private func badgeOverlay(for badge: Int, bundleID: String) -> BadgeOverlay? {
         guard badge > 0 || badge == -1 else { return nil }
-        if settings.isDotBadge(bundleID) { return .dot }
+        switch settings.displayMode(for: bundleID) {
+        case .dot:
+            return .dot
+        case .question:
+            return nil
+        case .badge:
+            break
+        }
         if badge == -1 { return .centerDot }
         return .text("\(min(badge, 99))")
     }
@@ -184,6 +197,12 @@ final class StatusBarManager {
             source.draw(in: rect)
             return true
         }
+    }
+
+    private func questionImage() -> NSImage? {
+        guard let url = Bundle.main.url(forResource: "question", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        return fittedImage(image)
     }
 
     private static func badgeImage(_ overlay: BadgeOverlay, color: NSColor) -> NSImage {

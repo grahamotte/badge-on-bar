@@ -158,6 +158,7 @@ private struct SettingsRow: View {
 
 private struct SettingsDetailView: View {
     @Environment(AppSettings.self) private var settings
+    @State private var confirmingReset = false
     private let demoCounts = [-1, 0, 1, 3, 21, 99, 999]
 
     var body: some View {
@@ -185,23 +186,21 @@ private struct SettingsDetailView: View {
 
                 HStack(alignment: .center, spacing: 16) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Show as Dot")
+                        Text("Display")
                             .fontWeight(.medium)
-                        Text("Replace badge counts with a small dot for new apps.")
+                        Text("Choose how new apps display badge activity.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { settings.dotBadgeDefault },
-                        set: { settings.setDotBadgeDefault($0) }
+                    DisplayModePicker(selection: Binding(
+                        get: { settings.displayModeDefault },
+                        set: { settings.setDisplayModeDefault($0) }
                     ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    Button("Change All") {
-                        settings.setAllDotBadgesToDefault()
+                    Button("Set All") {
+                        settings.setAllDisplayModesToDefault()
                     }
-                    .disabled(settings.allDotBadgesMatchDefault)
+                    .disabled(settings.allDisplayModesMatchDefault)
                     .controlSize(.small)
                 }
 
@@ -218,7 +217,7 @@ private struct SettingsDetailView: View {
                         get: { settings.badgeColorDefault },
                         set: { settings.setBadgeColorDefault($0) }
                     ))
-                    Button("Change All") {
+                    Button("Set All") {
                         settings.setAllBadgeColorsToDefault()
                     }
                     .disabled(settings.allBadgeColorsMatchDefault)
@@ -238,7 +237,7 @@ private struct SettingsDetailView: View {
                         get: { settings.zeroBehaviorDefault },
                         set: { settings.setZeroBehaviorDefault($0) }
                     ))
-                    Button("Change All") {
+                    Button("Set All") {
                         settings.setAllZeroBehaviorsToDefault()
                     }
                     .disabled(settings.allZeroBehaviorsMatchDefault)
@@ -259,13 +258,21 @@ private struct SettingsDetailView: View {
                         }
                         .controlSize(.small)
                     }
-
-                    Button("Reset All to Default") {
-                        settings.resetAllToDefaults()
-                    }
-                    .controlSize(.small)
                 }
+
+                Button("Reset Config") {
+                    confirmingReset = true
+                }
+                .controlSize(.small)
             }
+        }
+        .alert("Reset Config?", isPresented: $confirmingReset) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset Config", role: .destructive) {
+                settings.resetAllToDefaults()
+            }
+        } message: {
+            Text("This clears monitored apps and restores all settings to their defaults.")
         }
     }
 }
@@ -341,14 +348,20 @@ private struct MonitoredAppDetailView: View {
 
             Divider()
 
-            SettingToggle(
-                title: "Show as Dot",
-                subtitle: "Replace the badge count with a small dot.",
-                isOn: Binding(
-                    get: { settings.isDotBadge(app.bundleID) },
-                    set: { settings.setDotBadge(app.bundleID, enabled: $0) }
-                )
-            )
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Display")
+                        .fontWeight(.medium)
+                    Text("Choose how this app displays badge activity.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                DisplayModePicker(selection: Binding(
+                    get: { settings.displayMode(for: app.bundleID) },
+                    set: { settings.setDisplayMode(app.bundleID, mode: $0) }
+                ))
+            }
 
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -399,6 +412,43 @@ private struct ZeroBehaviorPicker: View {
         .labelsHidden()
         .pickerStyle(.segmented)
         .frame(width: 210)
+    }
+}
+
+private struct DisplayModePicker: View {
+    let selection: Binding<DisplayMode>
+
+    var body: some View {
+        Picker("", selection: selection) {
+            ForEach(DisplayMode.allCases) { mode in
+                if mode == .question {
+                    QuestionDisplayIcon().tag(mode)
+                } else {
+                    Text(mode.name).tag(mode)
+                }
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 210)
+    }
+}
+
+private struct QuestionDisplayIcon: View {
+    var body: some View {
+        if let image = Self.image {
+            Image(nsImage: image)
+        }
+    }
+
+    private static var image: NSImage? {
+        guard let url = Bundle.main.url(forResource: "question", withExtension: "png"),
+              let source = NSImage(contentsOf: url) else { return nil }
+        let size = NSSize(width: 12, height: 12)
+        return NSImage(size: size, flipped: false) { rect in
+            source.draw(in: rect)
+            return true
+        }
     }
 }
 
