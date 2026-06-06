@@ -1,12 +1,14 @@
 # Badge on Bar
 
-Badge on Bar is a native macOS menu bar app that monitors app badges in the Dock and shows them in your menu bar — so you never miss a notification, even in full screen or on a secondary display.
+Badge on Bar is a native macOS menu bar app that mirrors Dock badge counts into the menu bar.
 
-A rewrite of [Doll](https://github.com/xiaogdgenuine/Doll), originally by xiaogdgenuine.
+For notification zero people who have trust issues with hidden Dock badges.
 
-## Why
+<p align="center">
+  <img src="assets/screenshot.png" alt="Badge on Bar screenshot">
+</p>
 
-When you hide the Dock or work in full screen, Dock badges for Mail, Slack, Teams, and other apps are invisible. Badge on Bar shows those same badge counts right in the menu bar, always visible no matter what screen or space you're in.
+Badge on Bar is a modern native SwiftUI rewrite of [Doll](https://github.com/xiaogdgenuine/Doll).
 
 ## Contributing
 
