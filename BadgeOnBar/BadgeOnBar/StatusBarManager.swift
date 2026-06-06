@@ -1,8 +1,7 @@
 import AppKit
 
-private let statusItemLength: CGFloat = 22
-private let iconSize: CGFloat = 22
-private let demoBundleID = "__demo__"
+private let statusItemLength: CGFloat = 18
+private let iconSize: CGFloat = 18
 
 private extension NSImage {
     func grayOut() -> NSImage? {
@@ -32,60 +31,57 @@ final class StatusBarManager {
     func sync() {
         let monitored = settings.monitoredBundleIDs
 
-        for id in items.keys where id != demoBundleID && !monitored.contains(id) {
-            NSStatusBar.system.removeStatusItem(items[id]!)
+        for id in items.keys where !monitored.contains(id) {
+            if let item = items[id] {
+                NSStatusBar.system.removeStatusItem(item)
+            }
             items[id] = nil
         }
 
         for bundleID in monitored {
-            let badge = monitor.badges[bundleID] ?? 0
+            let badge = settings.demoBadgeOverride ?? monitor.badges[bundleID] ?? 0
             let appInfo = monitor.availableApps.first { $0.bundleID == bundleID }
             let (name, icon) = resolve(bundleID, runningApp: appInfo)
-
-            if let item = items[bundleID] {
-                configure(item, name: name, icon: icon, badge: badge)
-            } else {
-                let item = NSStatusBar.system.statusItem(withLength: statusItemLength)
-                item.autosaveName = "BadgeOnBar_\(bundleID)"
-                configure(item, name: name, icon: icon, badge: badge)
-                let btn = item.button!
-                btn.target = self
-                btn.action = #selector(clicked(_:))
-                btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
-                items[bundleID] = item
-            }
-        }
-
-        if settings.demoModeEnabled {
-            let demoIcon = NSImage(named: NSImage.applicationIconName)
-            let badge = settings.demoBadgeCount
-            if let item = items[demoBundleID] {
-                configure(item, name: "Demo", icon: demoIcon, badge: badge)
-            } else {
-                let item = NSStatusBar.system.statusItem(withLength: statusItemLength)
-                item.autosaveName = "BadgeOnBar_\(demoBundleID)"
-                configure(item, name: "Demo", icon: demoIcon, badge: badge)
-                let btn = item.button!
-                btn.target = self
-                btn.action = #selector(clicked(_:))
-                btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
-                items[demoBundleID] = item
-            }
-        } else if let item = items[demoBundleID] {
-            NSStatusBar.system.removeStatusItem(item)
-            items[demoBundleID] = nil
+            configure(item(for: bundleID), name: name, icon: icon, badge: badge, bundleID: bundleID)
         }
     }
 
-    private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, badge: Int) {
+    private func item(for bundleID: String) -> NSStatusItem {
+        if let item = items[bundleID] { return item }
+
+        let item = NSStatusBar.system.statusItem(withLength: statusItemLength)
+        item.autosaveName = "BadgeOnBar_\(bundleID)"
         let btn = item.button!
-        btn.image = drawMenuBarIcon(icon: icon, badge: badge)
-        btn.image?.isTemplate = false
+        btn.target = self
+        btn.action = #selector(clicked(_:))
+        btn.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        items[bundleID] = item
+        return item
+    }
+
+    private func configure(_ item: NSStatusItem, name: String, icon: NSImage?, badge: Int, bundleID: String) {
+        let btn = item.button!
+        let dotBadge = settings.isDotBadge(bundleID)
+        let symbolIcon = settings.symbolOverride(for: bundleID).flatMap {
+            NSImage(systemSymbolName: $0, accessibilityDescription: name)?
+                .withSymbolConfiguration(.init(pointSize: iconSize, weight: .medium))
+        }
+        let menuIcon = symbolIcon ?? icon
+        let canvasRect = NSRect(origin: .zero, size: NSSize(width: iconSize, height: iconSize))
+        let iconRect = symbolIcon.map { aspectFitRect(for: $0, in: canvasRect) } ?? canvasRect
+
+        btn.image = drawMenuBarIcon(icon: menuIcon, badge: badge, iconRect: iconRect, templateTint: symbolIcon != nil, dotBadge: dotBadge)
+
         btn.imagePosition = .imageOnly
         btn.title = ""
         btn.attributedTitle = NSAttributedString()
         item.length = statusItemLength
-        btn.toolTip = badge > 0 ? "\(name): \(min(badge, 99))" : name
+        let tip: String = {
+            if badge > 0 { return "\(name): \(min(badge, 99))" }
+            if badge == -1 { return "\(name): \u{00B7}" }
+            return name
+        }()
+        btn.toolTip = tip
     }
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
@@ -95,27 +91,84 @@ final class StatusBarManager {
             onShowConfig?()
             return
         }
-        if id == demoBundleID { return }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
         }
     }
 
-    private func drawMenuBarIcon(icon: NSImage?, badge: Int) -> NSImage? {
+    private func drawMenuBarIcon(icon: NSImage?, badge: Int, iconRect: NSRect, templateTint: Bool, dotBadge: Bool) -> NSImage? {
         guard let icon else { return nil }
         let canvas = NSSize(width: iconSize, height: iconSize)
-        let drawIconSize = badge > 0 ? iconSize - 2 : iconSize
-        let offset = (iconSize - drawIconSize) / 2
-        let iconRect = NSRect(x: offset, y: offset, width: drawIconSize, height: drawIconSize)
         return NSImage(size: canvas, flipped: false) { _ in
-            if badge > 0 {
+            if templateTint {
                 icon.draw(in: iconRect)
-                self.drawBadgeDot(count: badge, canvasSize: canvas)
+                guard let ctx = NSGraphicsContext.current else { return true }
+                ctx.saveGraphicsState()
+                ctx.compositingOperation = .sourceIn
+                NSColor.controlTextColor.setFill()
+                iconRect.fill()
+                ctx.restoreGraphicsState()
+            } else if badge == 0 {
+                (self.renderedIcon(icon, in: iconRect, canvas: canvas).grayOut() ?? icon).draw(in: NSRect(origin: .zero, size: canvas))
             } else {
-                (icon.grayOut() ?? icon).draw(in: iconRect)
+                icon.draw(in: iconRect)
+            }
+
+            if badge > 0 || badge == -1 {
+                if dotBadge {
+                    self.drawDotOnly(canvasSize: canvas)
+                } else if badge == -1 {
+                    self.drawInterpunct(canvasSize: canvas)
+                } else {
+                    self.drawBadgeDot(count: badge, canvasSize: canvas)
+                }
             }
             return true
         }
+    }
+
+    private func renderedIcon(_ icon: NSImage, in rect: NSRect, canvas: NSSize) -> NSImage {
+        NSImage(size: canvas, flipped: false) { _ in
+            icon.draw(in: rect)
+            return true
+        }
+    }
+
+    private func aspectFitRect(for image: NSImage, in rect: NSRect) -> NSRect {
+        guard image.size.width > 0, image.size.height > 0 else { return rect }
+        let scale = min(rect.width / image.size.width, rect.height / image.size.height)
+        let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+        return NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height)
+    }
+
+    private func drawDotOnly(canvasSize: NSSize) {
+        let diameter: CGFloat = 8
+        let margin: CGFloat = 1
+        let origin = NSPoint(x: canvasSize.width - diameter - margin,
+                             y: canvasSize.height - diameter - margin)
+        let oval = NSRect(origin: origin, size: NSSize(width: diameter, height: diameter))
+        NSColor.systemRed.withAlphaComponent(0.9).setFill()
+        NSBezierPath(ovalIn: oval).fill()
+    }
+
+    private func drawInterpunct(canvasSize: NSSize) {
+        let text = "\u{00B7}"
+        let font = NSFont.boldSystemFont(ofSize: 8)
+        let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let textSize = (text as NSString).size(withAttributes: attr)
+        let diameter = max(textSize.width, textSize.height) + 4
+        let badgeSize = NSSize(width: diameter, height: diameter)
+
+        let badgeOrigin = NSPoint(x: (canvasSize.width - badgeSize.width) / 2,
+                                   y: (canvasSize.height - badgeSize.height) / 2)
+        let oval = NSRect(origin: badgeOrigin, size: badgeSize)
+
+        NSColor.systemRed.withAlphaComponent(0.9).setFill()
+        NSBezierPath(ovalIn: oval).fill()
+
+        let tx = oval.minX + (diameter - textSize.width) / 2
+        let ty = oval.minY + (diameter - textSize.height) / 2
+        (text as NSString).draw(at: NSPoint(x: tx, y: ty), withAttributes: attr)
     }
 
     private func drawBadgeDot(count: Int, canvasSize: NSSize) {
@@ -123,11 +176,11 @@ final class StatusBarManager {
         let font = NSFont.boldSystemFont(ofSize: 8)
         let attr: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
         let textSize = (text as NSString).size(withAttributes: attr)
-        let diameter = max(textSize.width, textSize.height) + 5
+        let diameter = max(textSize.width, textSize.height) + 4
         let badgeSize = NSSize(width: diameter, height: diameter)
 
-        let badgeOrigin = NSPoint(x: canvasSize.width - badgeSize.width,
-                                   y: canvasSize.height - badgeSize.height)
+        let badgeOrigin = NSPoint(x: (canvasSize.width - badgeSize.width) / 2,
+                                   y: (canvasSize.height - badgeSize.height) / 2)
         let oval = NSRect(origin: badgeOrigin, size: badgeSize)
 
         NSColor.systemRed.withAlphaComponent(0.9).setFill()
@@ -140,11 +193,7 @@ final class StatusBarManager {
 
     private func resolve(_ bundleID: String, runningApp: AppBadgeInfo?) -> (String, NSImage?) {
         if let runningApp, runningApp.icon != nil { return (runningApp.name, runningApp.icon) }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
-              let bundle = Bundle(url: url) else { return (bundleID, nil) }
-        let name = (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
-            ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String) ?? bundleID
-        let icon = NSWorkspace.shared.icon(forFile: url.path)
-        return (name, icon)
+        let app = AppBadgeInfo.fromBundleID(bundleID)
+        return (app?.name ?? bundleID, app?.icon)
     }
 }

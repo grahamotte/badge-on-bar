@@ -7,35 +7,57 @@ import ServiceManagement
 final class AppSettings {
     var monitoredBundleIDs: Set<String> = []
     var startAtLogin = false
-    var demoModeEnabled = false
-    var demoBadgeCount = 1
+    var demoBadgeOverride: Int?
+    var dotBadgeDefault = false
+    var dotBadgeOverrides: [String: Bool] = [:]
+    var symbolOverrides: [String: String] = [:]
 
+    @ObservationIgnored private var demoTask: Task<Void, Never>?
     var onChanged: (() -> Void)?
 
     private let defaults = UserDefaults.standard
     private let monitoredKey = "monitoredBundleIDs"
-    private let startAtLoginKey = "startAtLogin"
-    private let demoModeKey = "demoModeEnabled"
-    private let demoCountKey = "demoBadgeCount"
+    private let dotBadgeOverridesKey = "dotBadgeOverrides"
+    private let dotBadgeDefaultKey = "dotBadgeDefault"
+    private let symbolOverridesKey = "symbolOverrides"
 
     init() {
         if let ids = defaults.stringArray(forKey: monitoredKey) {
             monitoredBundleIDs = Set(ids)
         }
-        startAtLogin = defaults.bool(forKey: startAtLoginKey)
-        demoModeEnabled = defaults.bool(forKey: demoModeKey)
-        if defaults.object(forKey: demoCountKey) != nil {
-            demoBadgeCount = max(0, defaults.integer(forKey: demoCountKey))
+        refreshStartAtLoginStatus()
+        dotBadgeDefault = defaults.bool(forKey: dotBadgeDefaultKey)
+        if let overrides = defaults.dictionary(forKey: dotBadgeOverridesKey) as? [String: Bool] {
+            dotBadgeOverrides = overrides
+        }
+        if let overrides = defaults.dictionary(forKey: symbolOverridesKey) as? [String: String] {
+            symbolOverrides = overrides
+        }
+        if let ids = defaults.stringArray(forKey: "dotBadgeBundleIDs") {
+            for id in ids {
+                dotBadgeOverrides[id] = true
+            }
+            defaults.removeObject(forKey: "dotBadgeBundleIDs")
+            persistDotBadge()
+        }
+
+        for bundleID in monitoredBundleIDs where dotBadgeOverrides[bundleID] == nil {
+            dotBadgeOverrides[bundleID] = dotBadgeDefault
         }
     }
 
     func setMonitored(_ bundleID: String, monitored: Bool) {
         if monitored {
             monitoredBundleIDs.insert(bundleID)
+            dotBadgeOverrides[bundleID] = dotBadgeDefault
         } else {
             monitoredBundleIDs.remove(bundleID)
+            dotBadgeOverrides.removeValue(forKey: bundleID)
+            symbolOverrides.removeValue(forKey: bundleID)
         }
         save()
+        persistDotBadge()
+        persistSymbols()
         onChanged?()
     }
 
@@ -49,7 +71,6 @@ final class AppSettings {
 
     func setStartAtLogin(_ enabled: Bool) {
         startAtLogin = enabled
-        defaults.set(enabled, forKey: startAtLoginKey)
         do {
             if enabled {
                 try SMAppService.mainApp.register()
@@ -57,26 +78,78 @@ final class AppSettings {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            startAtLogin = false
-            defaults.set(false, forKey: startAtLoginKey)
+            refreshStartAtLoginStatus()
         }
     }
 
     func refreshStartAtLoginStatus() {
         startAtLogin = SMAppService.mainApp.status == .enabled
-        defaults.set(startAtLogin, forKey: startAtLoginKey)
     }
 
-    func setDemoMode(_ enabled: Bool) {
-        demoModeEnabled = enabled
-        defaults.set(enabled, forKey: demoModeKey)
+    func showBadgeDemo(_ count: Int) {
+        demoTask?.cancel()
+        demoBadgeOverride = count
+        onChanged?()
+        demoTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self?.demoBadgeOverride = nil
+                self?.onChanged?()
+            }
+        }
+    }
+
+    func isDotBadge(_ bundleID: String) -> Bool {
+        dotBadgeOverrides[bundleID] ?? dotBadgeDefault
+    }
+
+    func setDotBadge(_ bundleID: String, enabled: Bool) {
+        dotBadgeOverrides[bundleID] = enabled
+        persistDotBadge()
         onChanged?()
     }
 
-    func setDemoBadgeCount(_ count: Int) {
-        demoBadgeCount = max(0, count)
-        defaults.set(demoBadgeCount, forKey: demoCountKey)
+    func symbolOverride(for bundleID: String) -> String? {
+        symbolOverrides[bundleID]
+    }
+
+    func setSymbolOverride(_ bundleID: String, symbolName: String?) {
+        symbolOverrides[bundleID] = symbolName
+        persistSymbols()
         onChanged?()
+    }
+
+    func setDotBadgeDefault(_ enabled: Bool) {
+        dotBadgeDefault = enabled
+        defaults.set(dotBadgeDefault, forKey: dotBadgeDefaultKey)
+        onChanged?()
+    }
+
+    func setAllDotBadgesToDefault() {
+        let monitored = monitoredBundleIDs
+        for bundleID in monitored {
+            dotBadgeOverrides[bundleID] = dotBadgeDefault
+        }
+        persistDotBadge()
+        onChanged?()
+    }
+
+    var allDotBadgesMatchDefault: Bool {
+        for bundleID in monitoredBundleIDs {
+            if dotBadgeOverrides[bundleID] != dotBadgeDefault {
+                return false
+            }
+        }
+        return true
+    }
+
+    private func persistDotBadge() {
+        defaults.set(dotBadgeOverrides, forKey: dotBadgeOverridesKey)
+    }
+
+    private func persistSymbols() {
+        defaults.set(symbolOverrides, forKey: symbolOverridesKey)
     }
 
     private func save() {

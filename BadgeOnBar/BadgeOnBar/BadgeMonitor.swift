@@ -10,6 +10,7 @@ final class BadgeMonitor {
     var badges: [String: Int] = [:]
     var availableApps: [AppBadgeInfo] = []
     var dockApps: [AppBadgeInfo] = []
+    var installedApps: [AppBadgeInfo] = []
 
     var onUpdate: (() -> Void)?
 
@@ -126,6 +127,7 @@ final class BadgeMonitor {
 
     private func buildInstalledAppRegistry() {
         var registry: [String: (bundleID: String, name: String)] = [:]
+        var appsByID: [String: AppBadgeInfo] = [:]
         let dirs = ["/Applications", "/System/Applications",
                     NSString(string: "~/Applications").expandingTildeInPath]
         let fm = FileManager.default
@@ -139,9 +141,11 @@ final class BadgeMonitor {
                     ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
                     ?? item.replacingOccurrences(of: ".app", with: "")
                 registry[name] = (bundleID, name)
+                appsByID[bundleID] = AppBadgeInfo(bundleID: bundleID, name: name, icon: NSWorkspace.shared.icon(forFile: path))
             }
         }
         installedAppRegistry = registry
+        installedApps = appsByID.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     private func reloadDockElements() {
@@ -208,11 +212,7 @@ final class BadgeMonitor {
             if let running = availableApps.first(where: { $0.bundleID == bid }) {
                 return running
             }
-            var icon: NSImage?
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bid) {
-                icon = NSWorkspace.shared.icon(forFile: url.path)
-            }
-            return AppBadgeInfo(bundleID: bid, name: title, icon: icon)
+            return AppBadgeInfo.fromBundleID(bid, fallbackName: title)
         }
 
         if let app = availableApps.first(where: { $0.name == title }) {
@@ -228,11 +228,7 @@ final class BadgeMonitor {
         }
 
         if let (bundleID, name) = installedAppRegistry[title] {
-            var icon: NSImage?
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-                icon = NSWorkspace.shared.icon(forFile: url.path)
-            }
-            return AppBadgeInfo(bundleID: bundleID, name: name, icon: icon)
+            return AppBadgeInfo.fromBundleID(bundleID, fallbackName: name)
         }
 
         return nil
@@ -268,9 +264,12 @@ final class BadgeMonitor {
         for (bundleID, element) in dockAppElements {
             var label: AnyObject?
             guard AXUIElementCopyAttributeValue(element, "AXStatusLabel" as CFString, &label) == .success,
-                  let text = label as? String, !text.isEmpty,
-                  let count = Int(text) else { continue }
-            counts[bundleID] = count
+                  let text = label as? String, !text.isEmpty else { continue }
+            if let count = Int(text) {
+                counts[bundleID] = count
+            } else {
+                counts[bundleID] = -1
+            }
         }
         badges = counts
     }
