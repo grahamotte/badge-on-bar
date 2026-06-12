@@ -270,7 +270,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.badgeonbar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.badgeonbar2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -306,7 +306,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.badgeonbar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.grahamotte.badgeonbar2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
