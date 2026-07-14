@@ -34,6 +34,7 @@ final class StatusBarManager {
     private let settings: AppSettings
     private let monitor: BadgeMonitor
     private var items: [String: NSStatusItem] = [:]
+    private let appBundleID = Bundle.main.bundleIdentifier ?? "BadgeOnBar"
     var onShowConfig: (() -> Void)?
 
     init(settings: AppSettings, monitor: BadgeMonitor) {
@@ -47,7 +48,9 @@ final class StatusBarManager {
     func sync() {
         let monitored = settings.monitoredBundleIDs
         let badges = Dictionary(uniqueKeysWithValues: monitored.map { ($0, settings.demoBadgeOverride ?? monitor.badges[$0] ?? 0) })
-        let visible = monitored.filter { settings.zeroBehavior(for: $0) != .hide || badges[$0, default: 0] != 0 }
+        let visible = monitored.isEmpty
+            ? [appBundleID]
+            : monitored.filter { settings.zeroBehavior(for: $0) != .hide || badges[$0, default: 0] != 0 }
 
         for id in items.keys where !visible.contains(id) {
             if let item = items[id] {
@@ -57,10 +60,14 @@ final class StatusBarManager {
         }
 
         for bundleID in visible {
-            let badge = badges[bundleID] ?? 0
-            let appInfo = monitor.availableApps.first { $0.bundleID == bundleID }
-            let (name, icon) = resolve(bundleID, runningApp: appInfo)
-            configure(item(for: bundleID), name: name, icon: icon, badge: badge, bundleID: bundleID)
+            if monitored.isEmpty {
+                configure(item(for: bundleID), name: "Badge on Bar", icon: NSApp.applicationIconImage, badge: settings.demoBadgeOverride ?? 0, bundleID: bundleID)
+            } else {
+                let badge = badges[bundleID] ?? 0
+                let appInfo = monitor.availableApps.first { $0.bundleID == bundleID }
+                let (name, icon) = resolve(bundleID, runningApp: appInfo)
+                configure(item(for: bundleID), name: name, icon: icon, badge: badge, bundleID: bundleID)
+            }
         }
     }
 
@@ -101,14 +108,25 @@ final class StatusBarManager {
 
     @objc private func clicked(_ sender: NSStatusBarButton) {
         guard let (id, _) = items.first(where: { $0.value.button == sender }) else { return }
-        if let event = NSApp.currentEvent,
-           event.type == .rightMouseUp || event.modifierFlags.contains(.option) {
+        if let event = NSApp.currentEvent, event.type == .rightMouseUp {
+            let menu = NSMenu()
+            let item = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+            item.target = self
+            menu.addItem(item)
+            NSMenu.popUpContextMenu(menu, with: event, for: sender)
+            return
+        }
+        if NSApp.currentEvent?.modifierFlags.contains(.option) == true || id == appBundleID {
             onShowConfig?()
             return
         }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
         }
+    }
+
+    @objc private func openSettings() {
+        onShowConfig?()
     }
 
     // MARK: - Rendering
