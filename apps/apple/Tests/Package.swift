@@ -2,15 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "App",
+    name: "BadgeOnBar",
     platforms: [.macOS(.v15)],
     targets: [
         .target(
-            name: "App",
+            name: "BadgeOnBarCore",
             path: "App",
-            exclude: ["App.swift", "AppView.swift", "Assets.xcassets", "Config"],
-            sources: ["FocusTimer.swift"],
+            sources: ["AppSettings.swift"],
+            swiftSettings: [.swiftLanguageMode(.v5)],
         ),
-        .testTarget(name: "AppTests", dependencies: ["App"], path: "Tests", exclude: ["Package.swift"]),
+        .testTarget(
+            name: "BadgeOnBarCoreTests",
+            dependencies: ["BadgeOnBarCore"],
+            path: "Tests",
+            exclude: ["Package.swift"],
+        ),
     ]
 )

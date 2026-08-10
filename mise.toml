@@ -337,6 +337,13 @@ depends = ["dependencies:deploy"]
 usage = 'arg "<target>" help="Device to launch" choices "iphone" "phone" "ipad" "tablet" "mac" "macos" "osx" "tv" "tvos"'
 run = 'cd deploy && ruby simulate.rb "$usage_target"'
 
+[tasks.xcode]
+run = "open apps/apple/App.xcodeproj"
+
 #
 # Application
 #
+
+[tasks."app:generate-assets"]
+description = "Regenerate the macOS app icon catalog from assets/logo.png"
+run = "./scripts/generate-assets.sh"

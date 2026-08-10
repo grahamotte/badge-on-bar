@@ -59,4 +59,36 @@ The "Repo Specific" section blow contains rules specific to this repo only.
 
 ## Repo Specific
 
-None.
+### Badge On Bar
+
+Badge On Bar reads other apps' Dock badge counts through the macOS Accessibility API and mirrors selected badges into separate menu bar items. It is a native macOS menu bar accessory: no Dock icon and no main window unless configuration is open. It is distributed as a signed and notarized repository release, not through the App Store.
+
+### Apple App Architecture
+
+- The app source is in `apps/apple/App`; the Xcode project is `apps/apple/App.xcodeproj`.
+- `BadgeMonitor` owns Dock Accessibility polling, running and installed app discovery, and badge values.
+- `AppSettings` is the single source of truth for persisted defaults and per-app overrides.
+- `AppSettings` seeds defaults for newly discovered apps, removes stale overrides, and invokes its change callback after every persisted output mutation.
+- `StatusBarManager` owns `NSStatusItem` lifecycle, click handling, icons, and badge rendering.
+- `ConfigurationView` consumes `AppSettings` and `BadgeMonitor` through SwiftUI environment observation.
+- `BadgeOnBarApp` and `AppDelegate` own activation policy, the configuration window, permissions startup, and lifecycle glue.
+- Keep AppKit and Accessibility work on `@MainActor`. Use callbacks between AppKit managers and observable state.
+
+### Monitoring and Display Behavior
+
+- Start monitoring only after Accessibility trust is granted.
+- When Accessibility trust changes, start or stop monitoring immediately so stale badge state is cleared after permission is revoked.
+- Poll Dock badge values once per second; use AX observation only to invalidate the Dock element cache.
+- Preserve `-1` as the non-empty, non-integer badge value.
+- Resolve Dock entries from AX filename or URL, running app identity, bundle display name, then the installed app registry.
+- Create and remove status items synchronously in `StatusBarManager.sync()` and always set `autosaveName` to `BadgeOnBar_<bundleID>`.
+- Preserve badge, dot, count, and question display modes plus show, greyscale, and hide zero behavior.
+- Resize icons by drawing into a new `NSImage`; do not use TIFF round-trips.
+- Preserve the legacy dot-setting migration shims in `AppSettings`.
+
+### Apple Workflow
+
+- `mise test` runs the repository suite, including portable `AppSettings` tests.
+- Use `mise simulate macos` to build and launch the app and `mise xcode` to open the project.
+- Use `$publish` for versioning and the signed, notarized Codeberg and GitHub release workflow.
+- Keep the app dependency-free and the configuration UI compact, native, and settings-first.

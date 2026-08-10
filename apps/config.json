@@ -1,86 +1,27 @@
 {
-  "build": "0.2.0",
-  "contactEmail": "go@graham.lol",
-  "contactFirstName": "Graham",
-  "contactLastName": "Otte",
-  "contactPhone": "+1 202 555 0100",
-  "copyright": "2026 Graham Otte",
-  "demoAccountName": "",
-  "demoAccountPassword": "",
-  "demoAccountRequired": false,
-  "description": "Code Moto helps developers build momentum with focused coding sessions. Name what you're working on, choose a session length, and track completed sessions entirely on your device.",
-  "keywords": "focus,timer,coding,developer,productivity,session,momentum,work",
-  "marketingUrl": "https://codemoto.org",
-  "name": "Code Moto",
-  "notes": "Code Moto does not require an account or sign-in. All session data is stored locally on the device.",
-  "primaryLocale": "en-US",
-  "promotionalText": "Build momentum with focused coding sessions and keep a private record of completed work.",
-  "releaseType": "AFTER_APPROVAL",
-  "supportUrl": "https://codemoto.org",
+  "build": "0.6.0",
+  "description": "Badge On Bar mirrors selected macOS Dock badge counts into separate menu bar items.",
+  "marketingUrl": "https://badgeonbar.com",
+  "name": "Badge On Bar",
+  "skip_app_stores": true,
+  "supportUrl": "https://badgeonbar.com",
   "targets": {
     "apple": {
-      "ios": {
-        "archiveDestination": "generic/platform=iOS",
-        "bundleIdentifier": "com.grahamotte.codemoto",
-        "platform": "IOS",
-        "project": "apps/apple/App.xcodeproj",
-        "scheme": "App",
-        "screenshots": [
-          {
-            "displayType": "APP_IPHONE_65",
-            "path": "apps/screenshots/ios-iphone-1.jpeg"
-          },
-          {
-            "displayType": "APP_IPAD_PRO_3GEN_129",
-            "path": "apps/screenshots/ios-ipad-1.jpeg"
-          }
-        ],
-        "simulatorDestination": "generic/platform=iOS Simulator",
-        "simulatorProduct": "Debug-iphonesimulator/App.app",
-        "simulators": {
-          "ipad": "iPad",
-          "iphone": "iPhone"
-        }
-      },
       "macos": {
         "archiveDestination": "generic/platform=macOS",
-        "bundleIdentifier": "com.grahamotte.codemoto",
+        "bundleIdentifier": "com.grahamotte.badgeonbar2",
         "platform": "MAC_OS",
         "project": "apps/apple/App.xcodeproj",
-        "scheme": "App-macOS",
-        "screenshots": [
-          {
-            "displayType": "APP_DESKTOP",
-            "path": "apps/screenshots/macos-1.jpeg"
-          }
-        ],
+        "scheme": "BadgeOnBar",
         "simulatorDestination": "platform=macOS",
-        "simulatorProduct": "Debug/App-macOS.app",
+        "simulatorProduct": "Debug/BadgeOnBar.app",
         "simulators": {
           "macos": "Mac"
-        }
-      },
-      "tvos": {
-        "archiveDestination": "generic/platform=tvOS",
-        "bundleIdentifier": "com.grahamotte.codemoto",
-        "platform": "TV_OS",
-        "project": "apps/apple/App.xcodeproj",
-        "scheme": "App-tvOS",
-        "screenshots": [
-          {
-            "displayType": "APP_APPLE_TV",
-            "path": "apps/screenshots/tvos-1.jpeg"
-          }
-        ],
-        "simulatorDestination": "generic/platform=tvOS Simulator",
-        "simulatorProduct": "Debug-appletvsimulator/App-tvOS.app",
-        "simulators": {
-          "tv": "Apple TV"
         }
       }
     },
     "android": {}
   },
-  "version": "0.2.0",
-  "whatsNew": "Added repository-only macOS publishing and improved release reliability."
+  "version": "0.6.0",
+  "whatsNew": "Improved Dock icon behavior."
 }

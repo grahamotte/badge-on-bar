@@ -5,8 +5,10 @@
 !/tmp/pids/
 !/tmp/pids/.keep
 .byebug_history
+.DS_Store
 .yarn-integrity
 /.bundle
+/.build
 /app/assets/builds/*
 /config/master.key
 /config/credentials.yml.enc
@@ -40,5 +42,15 @@ frontend/dist
 .env.production
 .env.development
 .ruby-lsp
+.mise.local.toml
+/.netrc
+/Packages
+/certs
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+DerivedData/
+*.xcscmblueprint
+*.xcuserstate
+xcuserdata/
 /*/tmp
 /*/tmp/*
