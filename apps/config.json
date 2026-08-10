@@ -1,5 +1,5 @@
 {
-  "build": "0.6.0",
+  "build": "0.6.1",
   "description": "Badge On Bar mirrors selected macOS Dock badge counts into separate menu bar items.",
   "marketingUrl": "https://badgeonbar.com",
   "name": "Badge On Bar",
@@ -22,6 +22,6 @@
     },
     "android": {}
   },
-  "version": "0.6.0",
-  "whatsNew": "Improved Dock icon behavior."
+  "version": "0.6.1",
+  "whatsNew": "Bug fixes."
 }
